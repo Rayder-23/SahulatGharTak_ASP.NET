@@ -25,7 +25,7 @@ public class CustomerItemVm
     public DateTime? CreatedOn { get; set; }
 }
 
-public class CustomerFormVm
+public class CustomerFormVm : IValidatableObject
 {
     public int Uid { get; set; }
 
@@ -63,10 +63,36 @@ public class CustomerFormVm
     [Display(Name = "Location")]
     public string? Location { get; set; }
 
+    [DataType(DataType.Password)]
+    [Display(Name = "Password")]
+    public string Password { get; set; } = string.Empty;
+
+    [DataType(DataType.Password)]
+    [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+    [Display(Name = "Confirm Password")]
+    public string ConfirmPassword { get; set; } = string.Empty;
+
     public List<SelectListItem> CityOptions { get; set; } = new();
     public List<SelectListItem> LocationOptions { get; set; } = new();
     public List<SelectListItem> AlertOptions { get; set; } = new();
     public List<CustomerAddressItemVm> Addresses { get; set; } = new();
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Uid != 0)
+        {
+            yield break;
+        }
+
+        if (string.IsNullOrWhiteSpace(Password))
+        {
+            yield return new ValidationResult("Password is required.", [nameof(Password)]);
+        }
+        else if (Password.Length < 4)
+        {
+            yield return new ValidationResult("Password must be at least 4 characters.", [nameof(Password)]);
+        }
+    }
 }
 
 public class CustomerDetailsVm

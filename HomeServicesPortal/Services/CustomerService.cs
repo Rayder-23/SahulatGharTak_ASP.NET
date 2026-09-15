@@ -296,7 +296,7 @@ public class CustomerService : ICustomerService
         var user = new UsersLogin
         {
             MobileNo = mobile,
-            PasswordHash = PasswordHasher.Hash(Guid.NewGuid().ToString("N")[..8]),
+            PasswordHash = PasswordHasher.Hash(model.Password),
             UserType = UserTypeConstants.Client,
             IsActive = true,
             IsVerified = false,
