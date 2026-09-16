@@ -10,21 +10,26 @@ namespace HomeServicesPortal.Services;
 
 public class AuthService : IAuthService
 {
+    private const string CitiesConfigKey = "Cities";
+
     private readonly AppDbContext _db;
     private readonly IUserRepository _userRepository;
     private readonly IMapper _mapper;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IConfigurationEntryService _configurations;
 
     public AuthService(
         AppDbContext db,
         IUserRepository userRepository,
         IMapper mapper,
-        IFileStorageService fileStorageService)
+        IFileStorageService fileStorageService,
+        IConfigurationEntryService configurations)
     {
         _db = db;
         _userRepository = userRepository;
         _mapper = mapper;
         _fileStorageService = fileStorageService;
+        _configurations = configurations;
     }
 
     public async Task<(bool Success, string? Error, RegistrationResponse? Data)> RegisterClientAsync(
@@ -175,6 +180,20 @@ public class AuthService : IAuthService
             return (false, categoryError, null, StatusCodes.Status400BadRequest);
         }
 
+        var city = request.City?.Trim();
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            var cityOptions = await _configurations.GetValuesByKeyAsync(CitiesConfigKey, cancellationToken);
+            if (!cityOptions.Any(c => c.Equals(city, StringComparison.OrdinalIgnoreCase)))
+            {
+                return (false, $"City must be one of the configured options: {string.Join(", ", cityOptions)}.", null, StatusCodes.Status400BadRequest);
+            }
+        }
+        else
+        {
+            city = client.City;
+        }
+
         var fullName = !string.IsNullOrWhiteSpace(request.FullName)
             ? request.FullName.Trim()
             : client.FullName;
@@ -196,6 +215,7 @@ public class AuthService : IAuthService
                 Gender = request.Gender?.Trim() ?? client.Gender,
                 ExperienceYears = request.ExperienceYears ?? 0,
                 Description = request.Description?.Trim(),
+                City = city,
                 CategoryUid = categoryId!.Value,
                 IsVerified = false,
                 AverageRating = 0,
@@ -216,7 +236,8 @@ public class AuthService : IAuthService
                 MobileNo = user.MobileNo,
                 CategoryId = categoryId,
                 CategoryName = categoryName,
-                ClientId = client.Uid
+                ClientId = client.Uid,
+                City = city
             }, StatusCodes.Status200OK);
         }, cancellationToken);
     }

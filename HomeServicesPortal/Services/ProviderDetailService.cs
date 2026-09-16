@@ -6,11 +6,15 @@ namespace HomeServicesPortal.Services;
 
 public class ProviderDetailService : IProviderDetailService
 {
-    private readonly AppDbContext _db;
+    private const string CitiesConfigKey = "Cities";
 
-    public ProviderDetailService(AppDbContext db)
+    private readonly AppDbContext _db;
+    private readonly IConfigurationEntryService _configurations;
+
+    public ProviderDetailService(AppDbContext db, IConfigurationEntryService configurations)
     {
         _db = db;
+        _configurations = configurations;
     }
 
     public async Task<(bool Success, string? Error, ProviderDetailApiDto? Data)> GetProviderDetailAsync(
@@ -30,6 +34,7 @@ public class ProviderDetailService : IProviderDetailService
                 Gender = p.Gender,
                 ExperienceYears = p.ExperienceYears,
                 Description = p.Description,
+                City = p.City,
                 IsVerified = p.IsVerified,
                 AverageRating = p.AverageRating,
                 TotalReviews = p.TotalReviews,
@@ -70,6 +75,18 @@ public class ProviderDetailService : IProviderDetailService
         if (categoryError != null)
         {
             return (false, categoryError, null);
+        }
+
+        var city = request.City?.Trim();
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            var cityOptions = await _configurations.GetValuesByKeyAsync(CitiesConfigKey, cancellationToken);
+            if (!cityOptions.Any(c => c.Equals(city, StringComparison.OrdinalIgnoreCase)))
+            {
+                return (false, $"City must be one of the configured options: {string.Join(", ", cityOptions)}.", null);
+            }
+
+            provider.City = city;
         }
 
         provider.FullName = request.FullName.Trim();

@@ -25,6 +25,10 @@ public class UpdateProviderDetailRequestDto : IValidatableObject
     [StringLength(2000)]
     public string? Description { get; set; }
 
+    /// <summary>One of the configured city options (see GET /api/cities). Optional — omit/null leaves Providers.City unchanged.</summary>
+    [StringLength(100)]
+    public string? City { get; set; }
+
     [Range(1, int.MaxValue)]
     public int? CategoryId { get; set; }
 

@@ -21,6 +21,15 @@ public class UpdateCustomerServiceRequestDto
     [StringLength(150)]
     public string ServiceTitle { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Optional. ServiceTitles.UID for the selected title (see GET /api/service-titles?categoryUid={id}).
+    /// When provided, the request's estimated budget is re-derived server-side from
+    /// ServiceTitles.BasePrice — the title must exist, be active, and belong to CategoryUid, else 400.
+    /// Omit to leave the existing estimated budget unchanged.
+    /// </summary>
+    [Range(1, int.MaxValue)]
+    public int? ServiceTitleUid { get; set; }
+
     /// <summary>Optional. Omit, null, or empty string when no description is provided.</summary>
     [StringLength(4000)]
     public string? ServiceDescription { get; set; }
@@ -41,9 +50,6 @@ public class UpdateCustomerServiceRequestDto
     [Required(ErrorMessage = "Contact number is required.")]
     [StringLength(20)]
     public string ContactNo { get; set; } = string.Empty;
-
-    [Range(0, double.MaxValue)]
-    public decimal? EstimatedBudget { get; set; }
 
     [Required]
     [StringLength(30)]

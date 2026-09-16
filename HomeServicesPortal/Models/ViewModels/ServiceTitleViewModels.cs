@@ -24,7 +24,7 @@ public class ServiceTitleItemVm
     public string CategoryName { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public decimal? EstiBudget { get; set; }
+    public decimal? BasePrice { get; set; }
     public int DisplayOrder { get; set; }
     public bool IsActive { get; set; }
     public DateTime? CreatedOn { get; set; }
@@ -48,9 +48,9 @@ public class ServiceTitleFormVm
     [Display(Name = "Description")]
     public string? Description { get; set; }
 
-    [Display(Name = "Est. Budget")]
-    [Range(0, double.MaxValue)]
-    public decimal? EstiBudget { get; set; }
+    [Range(0, 100000000, ErrorMessage = "Estimated budget must be a positive amount.")]
+    [Display(Name = "Estimated Budget")]
+    public decimal? BasePrice { get; set; }
 
     [Display(Name = "Display Order")]
     public int DisplayOrder { get; set; }
@@ -68,7 +68,7 @@ public class ServiceTitleDetailsVm
     public string CategoryName { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public decimal? EstiBudget { get; set; }
+    public decimal? BasePrice { get; set; }
     public int DisplayOrder { get; set; }
     public bool IsActive { get; set; }
     public DateTime? CreatedOn { get; set; }

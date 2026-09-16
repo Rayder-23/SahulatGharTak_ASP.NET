@@ -18,6 +18,9 @@ public class ProviderDetailApiDto
 
     public string? Description { get; set; }
 
+    /// <summary>Providers.City — one of the configured city options (see GET /api/cities). Editable via PUT.</summary>
+    public string? City { get; set; }
+
     public bool IsVerified { get; set; }
 
     public decimal AverageRating { get; set; }

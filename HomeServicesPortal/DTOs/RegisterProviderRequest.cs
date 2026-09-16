@@ -27,6 +27,10 @@ public class RegisterProviderRequest : IValidatableObject
     [StringLength(2000)]
     public string? Description { get; set; }
 
+    /// <summary>One of the configured city options (see GET /api/cities). Optional — falls back to the client's existing city if omitted.</summary>
+    [StringLength(100)]
+    public string? City { get; set; }
+
     [Range(1, int.MaxValue, ErrorMessage = "Category id must be greater than 0.")]
     public int? CategoryId { get; set; }
 

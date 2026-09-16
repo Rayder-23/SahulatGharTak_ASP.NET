@@ -21,6 +21,15 @@ public class CreateCustomerServiceRequestDto
     [StringLength(150)]
     public string ServiceTitle { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Optional. ServiceTitles.UID for the selected title (see GET /api/service-titles?categoryUid={id}).
+    /// When provided, the request's estimated budget is populated server-side from
+    /// ServiceTitles.BasePrice — the title must exist, be active, and belong to CategoryUid, else 400.
+    /// The client can no longer set EstimatedBudget directly; omit this field to leave it unset.
+    /// </summary>
+    [Range(1, int.MaxValue)]
+    public int? ServiceTitleUid { get; set; }
+
     /// <summary>Optional. Omit, null, or empty string when no description is provided.</summary>
     [StringLength(4000)]
     public string? ServiceDescription { get; set; }
@@ -41,9 +50,6 @@ public class CreateCustomerServiceRequestDto
     [Required(ErrorMessage = "Contact number is required.")]
     [StringLength(20)]
     public string ContactNo { get; set; } = string.Empty;
-
-    [Range(0, double.MaxValue)]
-    public decimal? EstimatedBudget { get; set; }
 
     [StringLength(500)]
     public string? Remarks { get; set; }

@@ -22,4 +22,7 @@ public class ProviderUpgradeResponse
 
     /// <summary>Clients.UID for the account this provider profile was upgraded from — lets the app submit customer service requests immediately after upgrading, without a fresh login.</summary>
     public int? ClientId { get; set; }
+
+    /// <summary>Providers.City — one of the configured city options (see GET /api/cities).</summary>
+    public string? City { get; set; }
 }

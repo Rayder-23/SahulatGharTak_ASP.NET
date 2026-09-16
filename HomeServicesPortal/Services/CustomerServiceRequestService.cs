@@ -83,6 +83,16 @@ public class CustomerServiceRequestService : ICustomerServiceRequestService
             return (false, validationError, null);
         }
 
+        var (estimatedBudget, budgetError) = await ResolveEstimatedBudgetAsync(
+            request.ServiceTitleUid,
+            request.CategoryUid,
+            cancellationToken);
+
+        if (budgetError != null)
+        {
+            return (false, budgetError, null);
+        }
+
         var entity = new CustomerServiceRequest
         {
             ClientUid = request.ClientUid,
@@ -95,7 +105,7 @@ public class CustomerServiceRequestService : ICustomerServiceRequestService
             IsUrgent = request.IsUrgent,
             ContactPerson = request.ContactPerson?.Trim(),
             ContactNo = request.ContactNo.Trim(),
-            EstimatedBudget = request.EstimatedBudget,
+            EstimatedBudget = estimatedBudget,
             Status = RequestStatusConstants.Initiated,
             Remarks = request.Remarks?.Trim(),
             CreatedOn = DateTime.Now
@@ -143,6 +153,21 @@ public class CustomerServiceRequestService : ICustomerServiceRequestService
             return (false, validationError, null);
         }
 
+        if (request.ServiceTitleUid.HasValue)
+        {
+            var (estimatedBudget, budgetError) = await ResolveEstimatedBudgetAsync(
+                request.ServiceTitleUid,
+                request.CategoryUid,
+                cancellationToken);
+
+            if (budgetError != null)
+            {
+                return (false, budgetError, null);
+            }
+
+            entity.EstimatedBudget = estimatedBudget;
+        }
+
         entity.CategoryUid = request.CategoryUid;
         entity.ClientAddressUid = request.ClientAddressUid;
         entity.ServiceTitle = request.ServiceTitle.Trim();
@@ -152,7 +177,6 @@ public class CustomerServiceRequestService : ICustomerServiceRequestService
         entity.IsUrgent = request.IsUrgent;
         entity.ContactPerson = request.ContactPerson?.Trim();
         entity.ContactNo = request.ContactNo.Trim();
-        entity.EstimatedBudget = request.EstimatedBudget;
         entity.Status = RequestStatusConstants.Normalize(request.Status);
         entity.Remarks = request.Remarks?.Trim();
         entity.CancelReason = string.Equals(entity.Status, RequestStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase)
@@ -226,6 +250,35 @@ public class CustomerServiceRequestService : ICustomerServiceRequestService
         }
 
         return null;
+    }
+
+    private async Task<(decimal? EstimatedBudget, string? Error)> ResolveEstimatedBudgetAsync(
+        int? serviceTitleUid,
+        int categoryUid,
+        CancellationToken cancellationToken)
+    {
+        if (!serviceTitleUid.HasValue)
+        {
+            return (null, null);
+        }
+
+        var basePrice = await _db.ServiceTitles
+            .AsNoTracking()
+            .Where(t => t.Uid == serviceTitleUid.Value && t.IsActive)
+            .Select(t => new { t.CategoryUid, t.BasePrice })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (basePrice == null)
+        {
+            return (null, "Invalid or inactive service title.");
+        }
+
+        if (basePrice.CategoryUid != categoryUid)
+        {
+            return (null, "Service title does not belong to the selected category.");
+        }
+
+        return (basePrice.BasePrice, null);
     }
 
     private static readonly string[] ProviderVisibleStatuses = ["Accepted", "In Progress", "Completed", "Closed"];

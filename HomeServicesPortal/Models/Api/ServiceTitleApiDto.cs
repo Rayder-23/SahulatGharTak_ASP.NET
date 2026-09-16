@@ -12,6 +12,9 @@ public class ServiceTitleApiDto
 
     public string? Description { get; set; }
 
+    /// <summary>Admin-set price estimate for this title (ServiceTitles.BasePrice). Null if not set. Show as the read-only estimated budget on the service-request form.</summary>
+    public decimal? BasePrice { get; set; }
+
     public int DisplayOrder { get; set; }
 
     public DateTime? CreatedOn { get; set; }

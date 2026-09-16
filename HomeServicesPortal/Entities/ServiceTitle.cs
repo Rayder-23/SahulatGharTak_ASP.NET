@@ -10,7 +10,8 @@ public class ServiceTitle
 
     public string? Description { get; set; }
 
-    public decimal? EstiBudget { get; set; }
+    /// <summary>Admin-set price estimate for this specific title, shown read-only to customers on the request form and used to populate CustomerServiceRequests.EstimatedBudget server-side.</summary>
+    public decimal? BasePrice { get; set; }
 
     public int DisplayOrder { get; set; }
 
