@@ -153,11 +153,20 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
             existing.ProfilePhotoPath = profilePath;
             existing.CnicFrontImagePath = frontPath;
             existing.CnicBackImagePath = backPath;
-            // Re-upload resets verification until admin re-approves.
-            existing.IsVerified = false;
-            existing.VerifiedOn = null;
-            existing.VerifiedBy = null;
-            existing.VerificationRemarks = null;
+
+            // Replacing a CNIC image resets verification until admin re-approves,
+            // since that's the document a human actually checks. A profile photo
+            // swap alone does not reset it - it's validated live by on-device face
+            // detection at capture time, so it never needed manual review, and
+            // forcing a full re-verification loop for a simple selfie update would
+            // needlessly lock an already-verified provider out of the dashboard.
+            if (request.CnicFront != null || request.CnicBack != null)
+            {
+                existing.IsVerified = false;
+                existing.VerifiedOn = null;
+                existing.VerifiedBy = null;
+                existing.VerificationRemarks = null;
+            }
             existing.UpdatedOn = now;
 
             await _repository.UpdateAsync(existing, cancellationToken);
