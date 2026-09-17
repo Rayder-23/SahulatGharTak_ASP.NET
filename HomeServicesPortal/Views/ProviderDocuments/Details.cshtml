@@ -27,6 +27,21 @@
     <h2 class="mt-1 mb-0 h4"><i class="fa-solid fa-eye me-2 text-primary"></i>Legal Document Details <span class="text-muted fw-normal">#@Model.Uid</span></h2>
 </div>
 
+@if (TempData["SuccessMessage"] is string success)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i>@success
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["ErrorMessage"] is string error)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i>@error
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
 <div class="card hs-card">
     <div class="card-body p-3 pd-details-grid">
         <div class="row g-2 mb-2">
@@ -92,6 +107,18 @@
             </div>
             <div class="col-md-6"></div>
         </div>
+
+        @if (!Model.IsVerified)
+        {
+            <div class="d-flex justify-content-end mb-2">
+                <form asp-action="Verify" asp-route-id="@Model.Uid" method="post" class="d-inline" onsubmit="return confirm('Verify this provider\'s documents?');">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-success btn-sm">
+                        <i class="fa-solid fa-check me-1"></i>Verify
+                    </button>
+                </form>
+            </div>
+        }
 
         <div class="row g-2 mb-2">
             <div class="col-md-6">

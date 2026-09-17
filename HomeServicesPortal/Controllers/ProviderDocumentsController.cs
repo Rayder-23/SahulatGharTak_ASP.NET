@@ -88,6 +88,30 @@ public class ProviderDocumentsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost("/Admin/ProviderDocuments/Verify/{id:int}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Verify(int id, CancellationToken cancellationToken)
+    {
+        int? verifiedBy = null;
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(userIdClaim, out var userId))
+        {
+            verifiedBy = userId;
+        }
+
+        var (success, error) = await _service.VerifyAsync(id, verifiedBy, cancellationToken);
+        if (!success)
+        {
+            TempData["ErrorMessage"] = error ?? "Failed to verify document.";
+        }
+        else
+        {
+            TempData["SuccessMessage"] = "Provider documents verified successfully.";
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
     [HttpGet("/Admin/ProviderDocuments/Delete/{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {

@@ -31,6 +31,11 @@ public interface IProviderDocumentService
         int? verifiedByUserId,
         CancellationToken cancellationToken = default);
 
+    Task<(bool Success, string? Error)> VerifyAsync(
+        int id,
+        int? verifiedByUserId,
+        CancellationToken cancellationToken = default);
+
     Task<(bool Success, string? Error)> DeleteAsync(int id, CancellationToken cancellationToken = default);
 
     Task<ProviderDocumentFormVm> PopulateFormAsync(

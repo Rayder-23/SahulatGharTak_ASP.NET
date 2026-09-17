@@ -291,6 +291,24 @@ public class ProviderDocumentService : IProviderDocumentService
         return (true, null);
     }
 
+    public async Task<(bool Success, string? Error)> VerifyAsync(
+        int id,
+        int? verifiedByUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _db.ProviderDocuments.FirstOrDefaultAsync(d => d.Uid == id, cancellationToken);
+        if (entity == null) return (false, "Document record not found.");
+
+        entity.IsVerified = true;
+        entity.VerifiedOn = DateTime.Now;
+        entity.VerifiedBy = verifiedByUserId;
+        entity.UpdatedOn = DateTime.Now;
+
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Admin verified ProviderDocuments UID {Uid}", entity.Uid);
+        return (true, null);
+    }
+
     public async Task<(bool Success, string? Error)> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         var entity = await _db.ProviderDocuments.FirstOrDefaultAsync(d => d.Uid == id, cancellationToken);
