@@ -13,18 +13,25 @@ public class UploadProviderDocumentsRequestDto
     [FromForm(Name = "ProviderUID")]
     public int ProviderUid { get; set; }
 
-    /// <summary>Provider profile photo (jpg/jpeg/png, max 5 MB).</summary>
-    [Required]
+    /// <summary>
+    /// Provider profile photo (jpg/jpeg/png, max 5 MB). Optional on edit — a provider that
+    /// already has a documents row may omit this to leave the stored profile photo unchanged.
+    /// Required for a provider's first-ever submission (no existing documents row yet).
+    /// </summary>
     [FromForm(Name = "ProfilePhoto")]
-    public IFormFile ProfilePhoto { get; set; } = null!;
+    public IFormFile? ProfilePhoto { get; set; }
 
-    /// <summary>CNIC front image (jpg/jpeg/png, max 5 MB).</summary>
-    [Required]
+    /// <summary>
+    /// CNIC front image (jpg/jpeg/png, max 5 MB). Optional on edit — omit to leave the stored
+    /// image unchanged. Required for a provider's first-ever submission.
+    /// </summary>
     [FromForm(Name = "CNICFront")]
-    public IFormFile CnicFront { get; set; } = null!;
+    public IFormFile? CnicFront { get; set; }
 
-    /// <summary>CNIC back image (jpg/jpeg/png, max 5 MB).</summary>
-    [Required]
+    /// <summary>
+    /// CNIC back image (jpg/jpeg/png, max 5 MB). Optional on edit — omit to leave the stored
+    /// image unchanged. Required for a provider's first-ever submission.
+    /// </summary>
     [FromForm(Name = "CNICBack")]
-    public IFormFile CnicBack { get; set; } = null!;
+    public IFormFile? CnicBack { get; set; }
 }

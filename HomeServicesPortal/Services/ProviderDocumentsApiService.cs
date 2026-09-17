@@ -39,40 +39,94 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
             return (false, "Provider not found.", null, StatusCodes.Status404NotFound);
         }
 
-        var profileResult = await _fileStorage.SaveProviderImageAsync(
-            request.ProviderUid, request.ProfilePhoto, "profile.jpg", cancellationToken);
-        if (!profileResult.Success)
-        {
-            _logger.LogWarning(
-                "Profile photo validation/upload failed for provider {ProviderUid}: {Error}",
-                request.ProviderUid,
-                profileResult.Error);
-            return (false, profileResult.Error, null, profileResult.StatusCode);
-        }
-
-        var frontResult = await _fileStorage.SaveProviderImageAsync(
-            request.ProviderUid, request.CnicFront, "cnic_front.jpg", cancellationToken);
-        if (!frontResult.Success)
-        {
-            _logger.LogWarning(
-                "CNIC front validation/upload failed for provider {ProviderUid}: {Error}",
-                request.ProviderUid,
-                frontResult.Error);
-            return (false, frontResult.Error, null, frontResult.StatusCode);
-        }
-
-        var backResult = await _fileStorage.SaveProviderImageAsync(
-            request.ProviderUid, request.CnicBack, "cnic_back.jpg", cancellationToken);
-        if (!backResult.Success)
-        {
-            _logger.LogWarning(
-                "CNIC back validation/upload failed for provider {ProviderUid}: {Error}",
-                request.ProviderUid,
-                backResult.Error);
-            return (false, backResult.Error, null, backResult.StatusCode);
-        }
-
         var existing = await _repository.GetByProviderUidAsync(request.ProviderUid, cancellationToken);
+        var isFirstSubmission = existing == null;
+
+        // First-time registration (no documents row yet) must supply all three files.
+        // Once a documents row exists, any slot may be omitted to leave it unchanged.
+        if (isFirstSubmission)
+        {
+            if (request.ProfilePhoto == null || request.CnicFront == null || request.CnicBack == null)
+            {
+                return (false,
+                    "ProfilePhoto, CNICFront, and CNICBack are all required for a provider's first document submission.",
+                    null,
+                    StatusCodes.Status400BadRequest);
+            }
+        }
+
+        var profilePath = existing?.ProfilePhotoPath;
+        if (request.ProfilePhoto != null)
+        {
+            var profileResult = await _fileStorage.SaveProviderImageAsync(
+                request.ProviderUid, request.ProfilePhoto, "profile.jpg", cancellationToken);
+            if (!profileResult.Success)
+            {
+                _logger.LogWarning(
+                    "Profile photo validation/upload failed for provider {ProviderUid}: {Error}",
+                    request.ProviderUid,
+                    profileResult.Error);
+                return (false, profileResult.Error, null, profileResult.StatusCode);
+            }
+
+            profilePath = profileResult.RelativePath;
+        }
+        else if (string.IsNullOrEmpty(profilePath))
+        {
+            return (false,
+                "No ProfilePhoto was provided and there is no existing profile photo to keep.",
+                null,
+                StatusCodes.Status400BadRequest);
+        }
+
+        var frontPath = existing?.CnicFrontImagePath;
+        if (request.CnicFront != null)
+        {
+            var frontResult = await _fileStorage.SaveProviderImageAsync(
+                request.ProviderUid, request.CnicFront, "cnic_front.jpg", cancellationToken);
+            if (!frontResult.Success)
+            {
+                _logger.LogWarning(
+                    "CNIC front validation/upload failed for provider {ProviderUid}: {Error}",
+                    request.ProviderUid,
+                    frontResult.Error);
+                return (false, frontResult.Error, null, frontResult.StatusCode);
+            }
+
+            frontPath = frontResult.RelativePath;
+        }
+        else if (string.IsNullOrEmpty(frontPath))
+        {
+            return (false,
+                "No CNICFront was provided and there is no existing CNIC front image to keep.",
+                null,
+                StatusCodes.Status400BadRequest);
+        }
+
+        var backPath = existing?.CnicBackImagePath;
+        if (request.CnicBack != null)
+        {
+            var backResult = await _fileStorage.SaveProviderImageAsync(
+                request.ProviderUid, request.CnicBack, "cnic_back.jpg", cancellationToken);
+            if (!backResult.Success)
+            {
+                _logger.LogWarning(
+                    "CNIC back validation/upload failed for provider {ProviderUid}: {Error}",
+                    request.ProviderUid,
+                    backResult.Error);
+                return (false, backResult.Error, null, backResult.StatusCode);
+            }
+
+            backPath = backResult.RelativePath;
+        }
+        else if (string.IsNullOrEmpty(backPath))
+        {
+            return (false,
+                "No CNICBack was provided and there is no existing CNIC back image to keep.",
+                null,
+                StatusCodes.Status400BadRequest);
+        }
+
         var now = DateTime.Now;
 
         if (existing == null)
@@ -80,9 +134,9 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
             var document = new ProviderDocument
             {
                 ProviderUid = request.ProviderUid,
-                ProfilePhotoPath = profileResult.RelativePath,
-                CnicFrontImagePath = frontResult.RelativePath,
-                CnicBackImagePath = backResult.RelativePath,
+                ProfilePhotoPath = profilePath,
+                CnicFrontImagePath = frontPath,
+                CnicBackImagePath = backPath,
                 IsVerified = false,
                 VerifiedOn = null,
                 VerifiedBy = null,
@@ -96,9 +150,9 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
         }
         else
         {
-            existing.ProfilePhotoPath = profileResult.RelativePath;
-            existing.CnicFrontImagePath = frontResult.RelativePath;
-            existing.CnicBackImagePath = backResult.RelativePath;
+            existing.ProfilePhotoPath = profilePath;
+            existing.CnicFrontImagePath = frontPath;
+            existing.CnicBackImagePath = backPath;
             // Re-upload resets verification until admin re-approves.
             existing.IsVerified = false;
             existing.VerifiedOn = null;
