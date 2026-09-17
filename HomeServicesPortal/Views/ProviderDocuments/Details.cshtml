@@ -44,6 +44,18 @@
 
 <div class="card hs-card">
     <div class="card-body p-3 pd-details-grid">
+        @if (!Model.IsActive)
+        {
+            <div class="d-flex justify-content-end mb-2">
+                <form asp-action="Activate" asp-route-id="@Model.Uid" method="post" class="d-inline" onsubmit="return confirm('Activate this provider\'s account?');">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-success btn-sm">
+                        <i class="fa-solid fa-toggle-on me-1"></i>Activate
+                    </button>
+                </form>
+            </div>
+        }
+
         <div class="row g-2 mb-2">
             <div class="col-md-6">
                 <div class="row g-2">

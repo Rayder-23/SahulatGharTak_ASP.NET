@@ -112,6 +112,23 @@ public class ProviderDocumentsController : Controller
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    [HttpPost("/Admin/ProviderDocuments/Activate/{id:int}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Activate(int id, CancellationToken cancellationToken)
+    {
+        var (success, error) = await _service.ActivateAsync(id, cancellationToken);
+        if (!success)
+        {
+            TempData["ErrorMessage"] = error ?? "Failed to activate provider account.";
+        }
+        else
+        {
+            TempData["SuccessMessage"] = "Provider account activated successfully.";
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
     [HttpGet("/Admin/ProviderDocuments/Delete/{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
