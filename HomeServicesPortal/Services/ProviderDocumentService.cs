@@ -120,7 +120,6 @@ public class ProviderDocumentService : IProviderDocumentService
         return await (
             from d in _db.ProviderDocuments.AsNoTracking()
             join p in _db.Providers.AsNoTracking() on d.ProviderUid equals p.Uid
-            join u in _db.UsersLogins.AsNoTracking() on p.UserUid equals u.Uid
             where d.Uid == id
             select new ProviderDocumentDetailsVm
             {
@@ -134,7 +133,6 @@ public class ProviderDocumentService : IProviderDocumentService
                 VerifiedOn = d.VerifiedOn,
                 VerifiedBy = d.VerifiedBy,
                 VerificationRemarks = d.VerificationRemarks,
-                IsActive = u.IsActive,
                 CreatedOn = d.CreatedOn,
                 UpdatedOn = d.UpdatedOn
             }).FirstOrDefaultAsync(cancellationToken);
@@ -308,25 +306,6 @@ public class ProviderDocumentService : IProviderDocumentService
 
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Admin verified ProviderDocuments UID {Uid}", entity.Uid);
-        return (true, null);
-    }
-
-    public async Task<(bool Success, string? Error)> ActivateAsync(int id, CancellationToken cancellationToken = default)
-    {
-        var document = await _db.ProviderDocuments.AsNoTracking()
-            .FirstOrDefaultAsync(d => d.Uid == id, cancellationToken);
-        if (document == null) return (false, "Document record not found.");
-
-        var provider = await _db.Providers.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Uid == document.ProviderUid, cancellationToken);
-        if (provider == null) return (false, "Provider not found.");
-
-        var user = await _db.UsersLogins.FirstOrDefaultAsync(u => u.Uid == provider.UserUid, cancellationToken);
-        if (user == null) return (false, "Provider account not found.");
-
-        user.IsActive = true;
-        await _db.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Admin activated provider account for ProviderDocuments UID {Uid}", id);
         return (true, null);
     }
 

@@ -77,7 +77,6 @@ public class ProviderDocumentDetailsVm
     public DateTime? VerifiedOn { get; set; }
     public int? VerifiedBy { get; set; }
     public string? VerificationRemarks { get; set; }
-    public bool IsActive { get; set; }
     public DateTime CreatedOn { get; set; }
     public DateTime? UpdatedOn { get; set; }
 }
