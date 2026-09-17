@@ -26,7 +26,6 @@ public class ServiceProviderItemVm
     public int? ExperienceYears { get; set; }
     public decimal? Rating { get; set; }
     public bool IsVerified { get; set; }
-    public bool IsActive { get; set; }
     public string? ProfilePicturePath { get; set; }
     public DateTime? CreatedOn { get; set; }
 }
@@ -63,12 +62,6 @@ public class ServiceProviderFormVm : IValidatableObject
     [Display(Name = "Rating")]
     [Range(0, 5)]
     public decimal? Rating { get; set; }
-
-    [Display(Name = "Is Verified")]
-    public bool IsVerified { get; set; }
-
-    [Display(Name = "Is Active")]
-    public bool IsActive { get; set; } = true;
 
     [Display(Name = "Profile Picture")]
     public IFormFile? ProfilePicture { get; set; }
@@ -116,7 +109,6 @@ public class ServiceProviderDetailsVm
     public int? ExperienceYears { get; set; }
     public decimal? Rating { get; set; }
     public bool IsVerified { get; set; }
-    public bool IsActive { get; set; }
     public string? ProfilePicturePath { get; set; }
     public DateTime? CreatedOn { get; set; }
 }

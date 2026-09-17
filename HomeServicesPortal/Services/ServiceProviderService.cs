@@ -127,8 +127,7 @@ public class ServiceProviderService : IServiceProviderService
                 CategoryName = p.Category.CategoryName,
                 ExperienceYears = p.ExperienceYears,
                 Rating = p.AverageRating,
-                IsVerified = p.IsVerified,
-                IsActive = p.User.IsActive,
+                IsVerified = _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified),
                 ProfilePicturePath = null,
                 CreatedOn = p.CreatedOn
             })
@@ -161,8 +160,7 @@ public class ServiceProviderService : IServiceProviderService
                 CategoryName = p.Category.CategoryName,
                 ExperienceYears = p.ExperienceYears,
                 Rating = p.AverageRating,
-                IsVerified = p.IsVerified,
-                IsActive = p.User.IsActive,
+                IsVerified = _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified),
                 ProfilePicturePath = null,
                 CreatedOn = p.CreatedOn
             })
@@ -183,9 +181,7 @@ public class ServiceProviderService : IServiceProviderService
                 City = p.City,
                 CategoryUid = p.CategoryUid,
                 ExperienceYears = p.ExperienceYears,
-                Rating = p.AverageRating,
-                IsVerified = p.IsVerified,
-                IsActive = p.User.IsActive
+                Rating = p.AverageRating
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -260,7 +256,6 @@ public class ServiceProviderService : IServiceProviderService
             MobileNo = mobile,
             PasswordHash = PasswordHasher.Hash(model.Password),
             UserType = UserTypeConstants.Provider,
-            IsActive = model.IsActive,
             IsVerified = false,
             CreatedOn = DateTime.Now
         };
@@ -275,7 +270,7 @@ public class ServiceProviderService : IServiceProviderService
             Cnic = model.Cnic.Trim(),
             City = string.IsNullOrWhiteSpace(model.City) ? null : model.City.Trim(),
             ExperienceYears = model.ExperienceYears ?? 0,
-            IsVerified = model.IsVerified,
+            IsVerified = false,
             AverageRating = model.Rating ?? 0,
             CategoryUid = model.CategoryUid,
             IsAvailable = true,
@@ -333,9 +328,7 @@ public class ServiceProviderService : IServiceProviderService
         provider.CategoryUid = model.CategoryUid;
         provider.ExperienceYears = model.ExperienceYears ?? 0;
         provider.AverageRating = model.Rating ?? provider.AverageRating;
-        provider.IsVerified = model.IsVerified;
         provider.User.MobileNo = mobile;
-        provider.User.IsActive = model.IsActive;
 
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Provider {Uid} updated.", model.Uid);

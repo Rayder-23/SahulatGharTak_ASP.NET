@@ -482,7 +482,8 @@ public class BookingService : IBookingService
 
         var matchingProviders = await _db.Providers
             .AsNoTracking()
-            .Where(p => p.User.IsActive && p.CategoryUid == request.CategoryUid)
+            .Where(p => p.User.IsActive && p.CategoryUid == request.CategoryUid
+                && _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified))
             .OrderBy(p => p.FullName)
             .Select(p => new SelectListItem
             {
@@ -506,7 +507,8 @@ public class BookingService : IBookingService
                 .AsNoTracking()
                 .Where(p => p.User.IsActive
                     && p.City != null
-                    && p.City.ToLower() == cityLower)
+                    && p.City.ToLower() == cityLower
+                    && _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified))
                 .OrderBy(p => p.FullName)
                 .Select(p => new SelectListItem
                 {
@@ -614,13 +616,14 @@ public class BookingService : IBookingService
 
         var providers = await _db.Providers
             .AsNoTracking()
-            .Where(p => providerUids.Contains(p.Uid))
+            .Where(p => providerUids.Contains(p.Uid)
+                && _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified))
             .Select(p => new { p.Uid, p.CategoryUid, p.FullName, p.City })
             .ToListAsync(cancellationToken);
 
         if (providers.Count != providerUids.Count)
         {
-            return (false, "One or more selected providers do not exist.");
+            return (false, "One or more selected providers do not exist or are not verified.");
         }
 
         var clientCity = await _db.Clients
