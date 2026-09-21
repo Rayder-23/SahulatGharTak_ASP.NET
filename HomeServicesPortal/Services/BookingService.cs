@@ -483,7 +483,7 @@ public class BookingService : IBookingService
         var matchingProviders = await _db.Providers
             .AsNoTracking()
             .Where(p => p.User.IsActive && p.CategoryUid == request.CategoryUid
-                && _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified))
+                && p.IsVerified)
             .OrderBy(p => p.FullName)
             .Select(p => new SelectListItem
             {
@@ -508,7 +508,7 @@ public class BookingService : IBookingService
                 .Where(p => p.User.IsActive
                     && p.City != null
                     && p.City.ToLower() == cityLower
-                    && _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified))
+                    && p.IsVerified)
                 .OrderBy(p => p.FullName)
                 .Select(p => new SelectListItem
                 {
@@ -617,7 +617,7 @@ public class BookingService : IBookingService
         var providers = await _db.Providers
             .AsNoTracking()
             .Where(p => providerUids.Contains(p.Uid)
-                && _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified))
+                && p.IsVerified)
             .Select(p => new { p.Uid, p.CategoryUid, p.FullName, p.City })
             .ToListAsync(cancellationToken);
 

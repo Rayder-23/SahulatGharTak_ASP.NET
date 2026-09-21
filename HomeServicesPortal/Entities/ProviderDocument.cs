@@ -10,6 +10,9 @@ public class ProviderDocument
 
     public int ProviderUid { get; set; }
 
+    /// <summary>FK to Providers.MobileNo (1:1 with provider). Synced when provider mobile changes.</summary>
+    public string MobileNo { get; set; } = string.Empty;
+
     public string? ProfilePhotoPath { get; set; }
 
     public string? CnicFrontImagePath { get; set; }

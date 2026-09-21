@@ -28,7 +28,7 @@ public class ProviderDetailService : IProviderDetailService
             {
                 Uid = p.Uid,
                 UserUid = p.UserUid,
-                MobileNo = p.User.MobileNo,
+                MobileNo = p.MobileNo,
                 FullName = p.FullName,
                 Cnic = p.Cnic,
                 Gender = p.Gender,

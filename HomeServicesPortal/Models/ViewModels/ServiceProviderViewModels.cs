@@ -8,8 +8,8 @@ public class ServiceProviderListVm
 {
     public List<ServiceProviderItemVm> Items { get; set; } = new();
     public string? Search { get; set; }
-    public string Sort { get; set; } = "name";
-    public string SortDir { get; set; } = "asc";
+    public string Sort { get; set; } = "id";
+    public string SortDir { get; set; } = "desc";
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 10;
     public int TotalCount { get; set; }
@@ -60,8 +60,13 @@ public class ServiceProviderFormVm : IValidatableObject
     public int? ExperienceYears { get; set; }
 
     [Display(Name = "Rating")]
-    [Range(0, 5)]
     public decimal? Rating { get; set; }
+
+    [Display(Name = "Is Verified")]
+    public bool IsVerified { get; set; }
+
+    [Display(Name = "Is Active")]
+    public bool IsActive { get; set; } = true;
 
     [Display(Name = "Profile Picture")]
     public IFormFile? ProfilePicture { get; set; }
@@ -79,6 +84,9 @@ public class ServiceProviderFormVm : IValidatableObject
 
     public List<SelectListItem> Categories { get; set; } = new();
     public List<SelectListItem> CityOptions { get; set; } = new();
+
+    /// <summary>Embedded Legal Documents create/edit form (Edit page tab).</summary>
+    public ProviderDocumentFormVm DocumentForm { get; set; } = new();
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -109,8 +117,27 @@ public class ServiceProviderDetailsVm
     public int? ExperienceYears { get; set; }
     public decimal? Rating { get; set; }
     public bool IsVerified { get; set; }
+    public bool IsActive { get; set; }
     public string? ProfilePicturePath { get; set; }
     public DateTime? CreatedOn { get; set; }
+
+    /// <summary>Legal documents for this provider, matched by MobileNo (1:1).</summary>
+    public ServiceProviderDocumentTabVm? Documents { get; set; }
+}
+
+public class ServiceProviderDocumentTabVm
+{
+    public int Uid { get; set; }
+    public string MobileNo { get; set; } = string.Empty;
+    public string? ProfilePhotoPath { get; set; }
+    public string? CnicFrontImagePath { get; set; }
+    public string? CnicBackImagePath { get; set; }
+    public bool IsVerified { get; set; }
+    public DateTime? VerifiedOn { get; set; }
+    public int? VerifiedBy { get; set; }
+    public string? VerificationRemarks { get; set; }
+    public DateTime CreatedOn { get; set; }
+    public DateTime? UpdatedOn { get; set; }
 }
 
 public class ServiceProviderDeleteVm

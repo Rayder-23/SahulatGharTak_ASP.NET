@@ -48,7 +48,58 @@ public class ServiceProviderService : IServiceProviderService
     {
         model.Categories = await GetCategoryOptionsAsync(cancellationToken);
         model.CityOptions = await BuildCityOptionsAsync(model.City, cancellationToken);
+        if (model.Uid > 0)
+        {
+            await PopulateDocumentFormAsync(model, cancellationToken);
+        }
         return model;
+    }
+
+    private async Task PopulateDocumentFormAsync(
+        ServiceProviderFormVm model,
+        CancellationToken cancellationToken)
+    {
+        var docs = await GetDocumentsByMobileAsync(model.MobileNo, cancellationToken);
+        model.DocumentForm = new ProviderDocumentFormVm
+        {
+            Uid = docs?.Uid ?? 0,
+            ProviderUid = model.Uid,
+            ProviderName = model.FullName,
+            MobileNo = model.MobileNo,
+            ExistingProfilePhotoPath = docs?.ProfilePhotoPath,
+            ExistingCnicFrontPath = docs?.CnicFrontImagePath,
+            ExistingCnicBackPath = docs?.CnicBackImagePath,
+            VerificationRemarks = docs?.VerificationRemarks
+        };
+    }
+
+    private async Task<ServiceProviderDocumentTabVm?> GetDocumentsByMobileAsync(
+        string? mobileNo,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(mobileNo))
+        {
+            return null;
+        }
+
+        return await _db.ProviderDocuments
+            .AsNoTracking()
+            .Where(d => d.MobileNo == mobileNo)
+            .Select(d => new ServiceProviderDocumentTabVm
+            {
+                Uid = d.Uid,
+                MobileNo = d.MobileNo,
+                ProfilePhotoPath = d.ProfilePhotoPath,
+                CnicFrontImagePath = d.CnicFrontImagePath,
+                CnicBackImagePath = d.CnicBackImagePath,
+                IsVerified = false, // display unused; status comes from Providers.IsVerified
+                VerifiedOn = d.VerifiedOn,
+                VerifiedBy = d.VerifiedBy,
+                VerificationRemarks = d.VerificationRemarks,
+                CreatedOn = d.CreatedOn,
+                UpdatedOn = d.UpdatedOn
+            })
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private async Task<List<SelectListItem>> BuildCityOptionsAsync(
@@ -82,8 +133,8 @@ public class ServiceProviderService : IServiceProviderService
     {
         const int pageSize = 10;
         page = page < 1 ? 1 : page;
-        sort = string.IsNullOrWhiteSpace(sort) ? "name" : sort.ToLowerInvariant();
-        sortDir = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+        sort = string.IsNullOrWhiteSpace(sort) ? "id" : sort.ToLowerInvariant();
+        sortDir = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
 
         var query = _db.Providers.AsNoTracking();
 
@@ -92,25 +143,25 @@ public class ServiceProviderService : IServiceProviderService
             var term = search.Trim();
             query = query.Where(p =>
                 p.FullName.Contains(term) ||
-                p.User.MobileNo.Contains(term) ||
+                p.MobileNo.Contains(term) ||
                 p.Cnic.Contains(term) ||
                 p.Category.CategoryName.Contains(term));
         }
 
         query = sort switch
         {
-            "category" => sortDir == "desc"
-                ? query.OrderByDescending(p => p.Category.CategoryName)
-                : query.OrderBy(p => p.Category.CategoryName),
-            "rating" => sortDir == "desc"
-                ? query.OrderByDescending(p => p.AverageRating)
-                : query.OrderBy(p => p.AverageRating),
+            "id" or "uid" => sortDir == "desc"
+                ? query.OrderByDescending(p => p.Uid)
+                : query.OrderBy(p => p.Uid),
+            "name" => sortDir == "desc"
+                ? query.OrderByDescending(p => p.FullName)
+                : query.OrderBy(p => p.FullName),
             "date" => sortDir == "desc"
                 ? query.OrderByDescending(p => p.CreatedOn)
                 : query.OrderBy(p => p.CreatedOn),
             _ => sortDir == "desc"
-                ? query.OrderByDescending(p => p.FullName)
-                : query.OrderBy(p => p.FullName)
+                ? query.OrderByDescending(p => p.Uid)
+                : query.OrderBy(p => p.Uid)
         };
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -122,12 +173,12 @@ public class ServiceProviderService : IServiceProviderService
             {
                 Uid = p.Uid,
                 FullName = p.FullName,
-                MobileNo = p.User.MobileNo,
+                MobileNo = p.MobileNo,
                 Cnic = p.Cnic,
                 CategoryName = p.Category.CategoryName,
                 ExperienceYears = p.ExperienceYears,
                 Rating = p.AverageRating,
-                IsVerified = _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified),
+                IsVerified = p.IsVerified,
                 ProfilePicturePath = null,
                 CreatedOn = p.CreatedOn
             })
@@ -147,24 +198,42 @@ public class ServiceProviderService : IServiceProviderService
 
     public async Task<ServiceProviderDetailsVm?> GetDetailsAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _db.Providers
+        var provider = await _db.Providers
             .AsNoTracking()
             .Where(p => p.Uid == id)
             .Select(p => new ServiceProviderDetailsVm
             {
                 Uid = p.Uid,
                 FullName = p.FullName,
-                MobileNo = p.User.MobileNo,
+                MobileNo = p.MobileNo,
                 Cnic = p.Cnic,
                 City = p.City,
                 CategoryName = p.Category.CategoryName,
                 ExperienceYears = p.ExperienceYears,
                 Rating = p.AverageRating,
-                IsVerified = _db.ProviderDocuments.Any(d => d.ProviderUid == p.Uid && d.IsVerified),
-                ProfilePicturePath = null,
+                IsVerified = p.IsVerified,
+                IsActive = p.User.IsActive,
                 CreatedOn = p.CreatedOn
             })
             .FirstOrDefaultAsync(cancellationToken);
+
+        if (provider == null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(provider.MobileNo))
+        {
+            provider.Documents = await GetDocumentsByMobileAsync(provider.MobileNo, cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(provider.Documents?.ProfilePhotoPath))
+        {
+            var path = provider.Documents.ProfilePhotoPath.TrimStart('/');
+            provider.ProfilePicturePath = "/" + path;
+        }
+
+        return provider;
     }
 
     public async Task<ServiceProviderFormVm?> GetForEditAsync(int id, CancellationToken cancellationToken = default)
@@ -176,12 +245,14 @@ public class ServiceProviderService : IServiceProviderService
             {
                 Uid = p.Uid,
                 FullName = p.FullName,
-                MobileNo = p.User.MobileNo,
+                MobileNo = p.MobileNo,
                 Cnic = p.Cnic,
                 City = p.City,
                 CategoryUid = p.CategoryUid,
                 ExperienceYears = p.ExperienceYears,
-                Rating = p.AverageRating
+                Rating = p.AverageRating,
+                IsVerified = p.IsVerified,
+                IsActive = p.User.IsActive
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -199,7 +270,7 @@ public class ServiceProviderService : IServiceProviderService
             {
                 Uid = p.Uid,
                 FullName = p.FullName,
-                MobileNo = p.User.MobileNo,
+                MobileNo = p.MobileNo,
                 CategoryName = p.Category.CategoryName
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -256,6 +327,7 @@ public class ServiceProviderService : IServiceProviderService
             MobileNo = mobile,
             PasswordHash = PasswordHasher.Hash(model.Password),
             UserType = UserTypeConstants.Provider,
+            IsActive = model.IsActive,
             IsVerified = false,
             CreatedOn = DateTime.Now
         };
@@ -266,11 +338,12 @@ public class ServiceProviderService : IServiceProviderService
         _db.Providers.Add(new Provider
         {
             UserUid = user.Uid,
+            MobileNo = mobile,
             FullName = model.FullName.Trim(),
             Cnic = model.Cnic.Trim(),
             City = string.IsNullOrWhiteSpace(model.City) ? null : model.City.Trim(),
             ExperienceYears = model.ExperienceYears ?? 0,
-            IsVerified = false,
+            IsVerified = model.IsVerified,
             AverageRating = model.Rating ?? 0,
             CategoryUid = model.CategoryUid,
             IsAvailable = true,
@@ -322,13 +395,23 @@ public class ServiceProviderService : IServiceProviderService
             return (false, "A user with this mobile number already exists.");
         }
 
+        var providerMobileTaken = await _db.Providers
+            .AnyAsync(p => p.MobileNo == mobile && p.Uid != provider.Uid, cancellationToken);
+        if (providerMobileTaken)
+        {
+            return (false, "A provider with this mobile number already exists.");
+        }
+
         provider.FullName = model.FullName.Trim();
         provider.Cnic = model.Cnic.Trim();
         provider.City = string.IsNullOrWhiteSpace(model.City) ? null : model.City.Trim();
         provider.CategoryUid = model.CategoryUid;
         provider.ExperienceYears = model.ExperienceYears ?? 0;
         provider.AverageRating = model.Rating ?? provider.AverageRating;
+        provider.IsVerified = model.IsVerified;
         provider.User.MobileNo = mobile;
+        provider.MobileNo = mobile; // ON UPDATE CASCADE syncs ProviderDocuments.MobileNo
+        provider.User.IsActive = model.IsActive;
 
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Provider {Uid} updated.", model.Uid);

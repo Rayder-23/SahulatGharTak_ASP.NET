@@ -19,6 +19,34 @@ public class ProviderDocumentRepository : IProviderDocumentRepository
         return _db.Providers.AsNoTracking().AnyAsync(p => p.Uid == providerUid, cancellationToken);
     }
 
+    public Task<string?> GetProviderMobileNoAsync(int providerUid, CancellationToken cancellationToken = default)
+    {
+        return _db.Providers.AsNoTracking()
+            .Where(p => p.Uid == providerUid)
+            .Select(p => (string?)p.MobileNo)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<bool?> GetProviderIsVerifiedAsync(int providerUid, CancellationToken cancellationToken = default)
+    {
+        return _db.Providers.AsNoTracking()
+            .Where(p => p.Uid == providerUid)
+            .Select(p => (bool?)p.IsVerified)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task SetProviderIsVerifiedAsync(int providerUid, bool isVerified, CancellationToken cancellationToken = default)
+    {
+        var provider = await _db.Providers.FirstOrDefaultAsync(p => p.Uid == providerUid, cancellationToken);
+        if (provider == null)
+        {
+            return;
+        }
+
+        provider.IsVerified = isVerified;
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
     public Task<ProviderDocument?> GetByProviderUidAsync(int providerUid, CancellationToken cancellationToken = default)
     {
         return _db.ProviderDocuments.FirstOrDefaultAsync(d => d.ProviderUid == providerUid, cancellationToken);

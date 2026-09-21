@@ -27,7 +27,7 @@
             <div class="col-md-6 col-lg-4">
                 <div class="input-group">
                     <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
-                    <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="Search provider name, CNIC, or ID..." />
+                    <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="Search name, mobile, CNIC, or ID..." />
                     <button type="submit" class="btn btn-outline-primary">Search</button>
                 </div>
             </div>
@@ -42,6 +42,7 @@
                 <thead class="table-light">
                     <tr>
                         <th><a class="text-decoration-none text-dark" asp-action="Index" asp-route-search="@Model.Search" asp-route-sort="provider" asp-route-sortDir="@(Model.Sort == "provider" && Model.SortDir == "asc" ? "desc" : "asc")">Provider</a></th>
+                        <th><a class="text-decoration-none text-dark" asp-action="Index" asp-route-search="@Model.Search" asp-route-sort="mobile" asp-route-sortDir="@(Model.Sort == "mobile" && Model.SortDir == "asc" ? "desc" : "asc")">Mobile</a></th>
                         <th>Images</th>
                         <th><a class="text-decoration-none text-dark" asp-action="Index" asp-route-search="@Model.Search" asp-route-sort="verified" asp-route-sortDir="@(Model.Sort == "verified" && Model.SortDir == "asc" ? "desc" : "asc")">Status</a></th>
                         <th><a class="text-decoration-none text-dark" asp-action="Index" asp-route-search="@Model.Search" asp-route-sort="created" asp-route-sortDir="@(Model.Sort == "created" && Model.SortDir == "asc" ? "desc" : "asc")">Created</a></th>
@@ -51,7 +52,7 @@
                 <tbody>
                     @if (!Model.Items.Any())
                     {
-                        <tr><td colspan="5" class="text-center text-muted py-4">No provider documents found.</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-4">No provider documents found.</td></tr>
                     }
                     @foreach (var item in Model.Items)
                     {
@@ -60,6 +61,7 @@
                                 <div class="fw-semibold">@item.ProviderName</div>
                                 <div class="small text-muted">UID #@item.ProviderUid</div>
                             </td>
+                            <td>@item.MobileNo</td>
                             <td>
                                 <div class="d-flex gap-1">
                                     @if (!string.IsNullOrWhiteSpace(item.ProfilePhotoPath))

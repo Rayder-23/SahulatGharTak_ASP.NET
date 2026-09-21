@@ -5,51 +5,51 @@
 }
 
 <style>
-    .pd-form-grid .form-label {
+    .pd-embed-form .form-label {
         font-size: 0.78rem;
         font-weight: 600;
         color: #6c757d;
         margin-bottom: 0;
     }
-    .pd-form-grid .form-control,
-    .pd-form-grid .form-select {
+    .pd-embed-form .form-control,
+    .pd-embed-form .form-select {
         font-size: 0.875rem;
     }
-    .pd-form-grid .pd-thumb {
+    .pd-embed-form .pd-thumb {
         max-height: 72px;
         margin-top: 0.35rem;
     }
-    .pd-form-grid .form-text {
+    .pd-embed-form .form-text {
         font-size: 0.72rem;
         margin-top: 0.2rem;
     }
 </style>
 
-<div class="pd-form-grid">
+<div class="pd-embed-form">
+    <input type="hidden" asp-for="Uid" />
+    <input type="hidden" asp-for="ProviderUid" />
+    <input type="hidden" asp-for="MobileNo" />
+
     <div class="row g-2 mb-2">
         <div class="col-md-6">
             <div class="row g-2 align-items-center">
                 <div class="col-sm-4">
-                    <label asp-for="ProviderUid" class="form-label"></label>
+                    <label class="form-label">Provider Name</label>
                 </div>
                 <div class="col-sm-8">
-                    @if (isEdit)
-                    {
-                        <input type="hidden" asp-for="ProviderUid" />
-                        <select class="form-select form-select-sm" asp-items="Model.Providers" disabled></select>
-                        <div class="form-text">Provider cannot be changed after create.</div>
-                    }
-                    else
-                    {
-                        <select asp-for="ProviderUid" class="form-select form-select-sm" asp-items="Model.Providers">
-                            <option value="">-- Select Provider --</option>
-                        </select>
-                        <span asp-validation-for="ProviderUid" class="text-danger small"></span>
-                    }
+                    <input type="text" class="form-control form-control-sm" value="@(Model.ProviderName ?? "")" readonly />
                 </div>
             </div>
         </div>
         <div class="col-md-6">
+            <div class="row g-2 align-items-center">
+                <div class="col-sm-4">
+                    <label class="form-label">Mobile No</label>
+                </div>
+                <div class="col-sm-8">
+                    <input type="text" class="form-control form-control-sm" value="@(Model.MobileNo ?? "")" readonly />
+                </div>
+            </div>
         </div>
     </div>
 
@@ -68,7 +68,7 @@
                     }
                     else
                     {
-                        <div class="form-text">JPG/PNG — max 5 MB. Required.</div>
+                        <div class="form-text">JPG/PNG — max 5 MB. Required on create.</div>
                     }
                     <span asp-validation-for="ProfilePhoto" class="text-danger small"></span>
                 </div>
@@ -88,7 +88,7 @@
                     }
                     else
                     {
-                        <div class="form-text">JPG/PNG — max 5 MB. Required.</div>
+                        <div class="form-text">JPG/PNG — max 5 MB. Required on create.</div>
                     }
                     <span asp-validation-for="CnicFront" class="text-danger small"></span>
                 </div>
@@ -111,7 +111,7 @@
                     }
                     else
                     {
-                        <div class="form-text">JPG/PNG — max 5 MB. Required.</div>
+                        <div class="form-text">JPG/PNG — max 5 MB. Required on create.</div>
                     }
                     <span asp-validation-for="CnicBack" class="text-danger small"></span>
                 </div>

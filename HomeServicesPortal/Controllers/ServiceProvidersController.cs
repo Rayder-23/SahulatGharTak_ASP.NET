@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using HomeServicesPortal.Models.ViewModels;
 using HomeServicesPortal.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -9,10 +10,14 @@ namespace HomeServicesPortal.Controllers;
 public class ServiceProvidersController : Controller
 {
     private readonly IServiceProviderService _service;
+    private readonly IProviderDocumentService _documents;
 
-    public ServiceProvidersController(IServiceProviderService service)
+    public ServiceProvidersController(
+        IServiceProviderService service,
+        IProviderDocumentService documents)
     {
         _service = service;
+        _documents = documents;
     }
 
     [HttpGet("/Admin/ServiceProviders")]
@@ -55,10 +60,11 @@ public class ServiceProvidersController : Controller
     }
 
     [HttpGet("/Admin/ServiceProviders/Edit/{id:int}")]
-    public async Task<IActionResult> Edit(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Edit(int id, string? tab, CancellationToken cancellationToken)
     {
         var vm = await _service.GetForEditAsync(id, cancellationToken);
         if (vm == null) return NotFound();
+        ViewBag.ActiveTab = tab;
         return View(vm);
     }
 
@@ -79,6 +85,65 @@ public class ServiceProvidersController : Controller
 
         TempData["SuccessMessage"] = $"Job Provider '{model.FullName}' updated successfully.";
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("/Admin/ServiceProviders/Edit/{id:int}/Documents")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveDocuments(int id, ProviderDocumentFormVm model, CancellationToken cancellationToken)
+    {
+        var provider = await _service.GetForEditAsync(id, cancellationToken);
+        if (provider == null) return NotFound();
+
+        // Always bind to the provider being edited (ignore tampered form values).
+        model.ProviderUid = id;
+        model.MobileNo = provider.MobileNo;
+        model.ProviderName = provider.FullName;
+
+        if (model.Uid > 0)
+        {
+            var existing = provider.DocumentForm;
+            if (existing.Uid != model.Uid || existing.ProviderUid != id)
+            {
+                TempData["ErrorMessage"] = "Document record does not belong to this provider.";
+                return RedirectToAction(nameof(Edit), new { id, tab = "documents" });
+            }
+        }
+        else if (provider.DocumentForm.Uid > 0)
+        {
+            // Race: a docs row appeared; switch to update that row.
+            model.Uid = provider.DocumentForm.Uid;
+            model.ExistingProfilePhotoPath = provider.DocumentForm.ExistingProfilePhotoPath;
+            model.ExistingCnicFrontPath = provider.DocumentForm.ExistingCnicFrontPath;
+            model.ExistingCnicBackPath = provider.DocumentForm.ExistingCnicBackPath;
+        }
+
+        int? verifiedBy = null;
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(userIdClaim, out var userId))
+        {
+            verifiedBy = userId;
+        }
+
+        var (success, error) = model.Uid > 0
+            ? await _documents.UpdateAsync(model, verifiedBy, cancellationToken)
+            : await _documents.CreateAsync(model, cancellationToken);
+
+        if (!success)
+        {
+            TempData["ErrorMessage"] = error ?? "Failed to save documents.";
+            var vm = await _service.GetForEditAsync(id, cancellationToken);
+            if (vm == null) return NotFound();
+            // Preserve uploaded-path previews / flags the user just posted where possible.
+            vm.DocumentForm.VerificationRemarks = model.VerificationRemarks;
+            ViewBag.ActiveTab = "documents";
+            ModelState.AddModelError(string.Empty, error ?? "Failed to save documents.");
+            return View("Edit", vm);
+        }
+
+        TempData["SuccessMessage"] = model.Uid > 0
+            ? "Provider documents updated successfully."
+            : "Provider documents created successfully.";
+        return RedirectToAction(nameof(Edit), new { id, tab = "documents" });
     }
 
     [HttpGet("/Admin/ServiceProviders/Delete/{id:int}")]

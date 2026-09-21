@@ -20,6 +20,7 @@ public class ProviderDocumentItemVm
 {
     public int Uid { get; set; }
     public int ProviderUid { get; set; }
+    public string MobileNo { get; set; } = string.Empty;
     public string ProviderName { get; set; } = string.Empty;
     public string? ProfilePhotoPath { get; set; }
     public string? CnicFrontImagePath { get; set; }
@@ -41,6 +42,12 @@ public class ProviderDocumentFormVm
     [Required(ErrorMessage = "Provider is required.")]
     [Display(Name = "Provider")]
     public int ProviderUid { get; set; }
+
+    [Display(Name = "Provider Name")]
+    public string? ProviderName { get; set; }
+
+    [Display(Name = "Mobile No")]
+    public string? MobileNo { get; set; }
 
     [Display(Name = "Profile Photo")]
     public IFormFile? ProfilePhoto { get; set; }
@@ -69,6 +76,7 @@ public class ProviderDocumentDetailsVm
 {
     public int Uid { get; set; }
     public int ProviderUid { get; set; }
+    public string MobileNo { get; set; } = string.Empty;
     public string ProviderName { get; set; } = string.Empty;
     public string? ProfilePhotoPath { get; set; }
     public string? CnicFrontImagePath { get; set; }
@@ -85,6 +93,7 @@ public class ProviderDocumentDeleteVm
 {
     public int Uid { get; set; }
     public int ProviderUid { get; set; }
+    public string MobileNo { get; set; } = string.Empty;
     public string ProviderName { get; set; } = string.Empty;
     public string? ProfilePhotoPath { get; set; }
     public string? CnicFrontImagePath { get; set; }

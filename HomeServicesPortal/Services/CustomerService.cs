@@ -31,8 +31,8 @@ public class CustomerService : ICustomerService
     {
         const int pageSize = 10;
         page = page < 1 ? 1 : page;
-        sort = string.IsNullOrWhiteSpace(sort) ? "name" : sort.ToLowerInvariant();
-        sortDir = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+        sort = string.IsNullOrWhiteSpace(sort) ? "id" : sort.ToLowerInvariant();
+        sortDir = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
 
         var query = _db.Clients.AsNoTracking();
 
@@ -48,6 +48,9 @@ public class CustomerService : ICustomerService
 
         query = sort switch
         {
+            "id" or "uid" => sortDir == "desc"
+                ? query.OrderByDescending(c => c.Uid)
+                : query.OrderBy(c => c.Uid),
             "mobile" => sortDir == "desc"
                 ? query.OrderByDescending(c => c.User.MobileNo)
                 : query.OrderBy(c => c.User.MobileNo),

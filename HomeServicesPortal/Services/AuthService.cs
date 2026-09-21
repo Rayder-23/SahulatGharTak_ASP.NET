@@ -210,6 +210,7 @@ public class AuthService : IAuthService
             var provider = new Provider
             {
                 UserUid = userId,
+                MobileNo = user.MobileNo,
                 FullName = fullName,
                 Cnic = cnic,
                 Gender = request.Gender?.Trim() ?? client.Gender,
@@ -488,6 +489,7 @@ public class AuthService : IAuthService
                 trackedProvider.FullName = anonymizedName;
                 // Cnic column is nvarchar(15) and required (not nullable) — keep this short.
                 trackedProvider.Cnic = $"DEL{provider.Uid}";
+                trackedProvider.MobileNo = anonymizedMobile;
                 trackedProvider.Gender = null;
                 trackedProvider.Description = null;
                 trackedProvider.IsAvailable = false;

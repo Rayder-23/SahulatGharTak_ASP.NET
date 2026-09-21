@@ -6,6 +6,9 @@ public class Provider
 
     public int UserUid { get; set; }
 
+    /// <summary>Denormalized from UsersLogin; unique alternate key used by ProviderDocuments.</summary>
+    public string MobileNo { get; set; } = string.Empty;
+
     public string FullName { get; set; } = string.Empty;
 
     public string Cnic { get; set; } = string.Empty;

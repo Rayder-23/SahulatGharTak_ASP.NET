@@ -1,4 +1,4 @@
-# Version: 4.4 | UpdatedAt: 16/09/2026
+# Version: 4.5 | UpdatedAt: 21/09/2026
 # Database: SahulatAppDB
 # Server: 34.131.41.192,1433
 
@@ -86,6 +86,7 @@ Table: Providers
 --------------------------------------------------------------------------------
   UID              int              NOT NULL  PK
   UserUID          int              NOT NULL  FK -> UsersLogin.UID  UNIQUE
+  MobileNo         nvarchar(20)     NOT NULL  UNIQUE  AK_Providers_MobileNo  -- denormalized from UsersLogin
   FullName         nvarchar(150)    NOT NULL
   CNIC             nvarchar(15)     NOT NULL  UNIQUE
   Gender           nvarchar(20)     NULL
@@ -107,12 +108,16 @@ Table: Providers
   -- Written by the SignalR LocationTrackingHub (PushLocation) and the REST PUT
   -- /api/provider-locations/{providerUid} fallback, via an idempotent conditional UPDATE that only
   -- applies when the caller-supplied ClientTimestampUtc is newer than the stored LocationUpdatedOn.
+  -- MobileNo is kept in sync with UsersLogin.MobileNo on create/update; used as alternate key
+  -- for ProviderDocuments (1:1).
 
 --------------------------------------------------------------------------------
 Table: ProviderDocuments
 --------------------------------------------------------------------------------
   UID                  int              NOT NULL  PK
   ProviderUID          int              NOT NULL  FK -> Providers.UID  UNIQUE
+  MobileNo             nvarchar(20)     NOT NULL  FK -> Providers.MobileNo  UNIQUE
+                                           -- ON UPDATE CASCADE; one docs row per provider/mobile
   ProfilePhotoPath     nvarchar(500)    NULL
   CNICFrontImagePath   nvarchar(500)    NULL
   CNICBackImagePath    nvarchar(500)    NULL
@@ -124,7 +129,7 @@ Table: ProviderDocuments
   UpdatedOn            datetime         NULL
   -- Relative paths only (e.g. uploads/providers/125/profile.jpg). One row per provider.
   -- Indexes: IX_ProviderDocuments_CreatedOn, IX_ProviderDocuments_MissingProfilePhoto (filtered),
-  --          IX_ProviderDocuments_CNICImagesPresent (filtered)
+  --          IX_ProviderDocuments_CNICImagesPresent (filtered), UQ_ProviderDocuments_MobileNo
 
 --------------------------------------------------------------------------------
 Table: AdminNotifications
@@ -548,6 +553,7 @@ FOREIGN KEY RELATIONSHIPS
   PaymentLedger.ProviderUID                -> Providers.UID
   ProviderPayouts.ProviderUID              -> Providers.UID
   ProviderDocuments.ProviderUID            -> Providers.UID
+  ProviderDocuments.MobileNo               -> Providers.MobileNo  (ON UPDATE CASCADE)
   ServiceCategories.ServiceUID             -> Services.UID
   ServiceTitles.CategoryUID                -> ServiceCategories.UID
 

@@ -8,7 +8,7 @@ namespace HomeServicesPortal.Services;
 
 /// <summary>
 /// Admin MVC service for ProviderDocuments (live schema: profile + CNIC paths).
-/// Uses AppDbContext / Providers ? not the removed ProviderProfiles table.
+/// Joins Providers ↔ ProviderDocuments on MobileNo (1:1); ProviderUID remains the UID FK.
 /// </summary>
 public class ProviderDocumentService : IProviderDocumentService
 {
@@ -30,17 +30,17 @@ public class ProviderDocumentService : IProviderDocumentService
         int? includeProviderUid = null,
         CancellationToken cancellationToken = default)
     {
-        var providersWithDocs = _db.ProviderDocuments.AsNoTracking().Select(d => d.ProviderUid);
+        var providersWithDocs = _db.ProviderDocuments.AsNoTracking().Select(d => d.MobileNo);
 
         return await _db.Providers
             .AsNoTracking()
             .Where(p => includeProviderUid.HasValue && p.Uid == includeProviderUid.Value
-                        || !providersWithDocs.Contains(p.Uid))
+                        || !providersWithDocs.Contains(p.MobileNo))
             .OrderBy(p => p.FullName)
             .Select(p => new SelectListItem
             {
                 Value = p.Uid.ToString(),
-                Text = p.FullName + " (#" + p.Uid + ")"
+                Text = p.FullName + " (" + p.MobileNo + ")"
             })
             .ToListAsync(cancellationToken);
     }
@@ -59,7 +59,7 @@ public class ProviderDocumentService : IProviderDocumentService
 
         var query =
             from d in _db.ProviderDocuments.AsNoTracking()
-            join p in _db.Providers.AsNoTracking() on d.ProviderUid equals p.Uid
+            join p in _db.Providers.AsNoTracking() on d.MobileNo equals p.MobileNo
             select new { Document = d, Provider = p };
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -68,17 +68,21 @@ public class ProviderDocumentService : IProviderDocumentService
             query = query.Where(x =>
                 x.Provider.FullName.Contains(term)
                 || x.Provider.Cnic.Contains(term)
+                || x.Document.MobileNo.Contains(term)
                 || x.Document.ProviderUid.ToString() == term);
         }
 
         query = sort switch
         {
             "verified" => sortDir == "desc"
-                ? query.OrderByDescending(x => x.Document.IsVerified).ThenBy(x => x.Provider.FullName)
-                : query.OrderBy(x => x.Document.IsVerified).ThenBy(x => x.Provider.FullName),
+                ? query.OrderByDescending(x => x.Provider.IsVerified).ThenBy(x => x.Provider.FullName)
+                : query.OrderBy(x => x.Provider.IsVerified).ThenBy(x => x.Provider.FullName),
             "created" => sortDir == "desc"
                 ? query.OrderByDescending(x => x.Document.CreatedOn)
                 : query.OrderBy(x => x.Document.CreatedOn),
+            "mobile" => sortDir == "desc"
+                ? query.OrderByDescending(x => x.Document.MobileNo)
+                : query.OrderBy(x => x.Document.MobileNo),
             _ => sortDir == "desc"
                 ? query.OrderByDescending(x => x.Provider.FullName)
                 : query.OrderBy(x => x.Provider.FullName)
@@ -93,11 +97,12 @@ public class ProviderDocumentService : IProviderDocumentService
             {
                 Uid = x.Document.Uid,
                 ProviderUid = x.Document.ProviderUid,
+                MobileNo = x.Document.MobileNo,
                 ProviderName = x.Provider.FullName,
                 ProfilePhotoPath = x.Document.ProfilePhotoPath,
                 CnicFrontImagePath = x.Document.CnicFrontImagePath,
                 CnicBackImagePath = x.Document.CnicBackImagePath,
-                IsVerified = x.Document.IsVerified,
+                IsVerified = x.Provider.IsVerified,
                 CreatedOn = x.Document.CreatedOn,
                 UpdatedOn = x.Document.UpdatedOn
             })
@@ -119,17 +124,18 @@ public class ProviderDocumentService : IProviderDocumentService
     {
         return await (
             from d in _db.ProviderDocuments.AsNoTracking()
-            join p in _db.Providers.AsNoTracking() on d.ProviderUid equals p.Uid
+            join p in _db.Providers.AsNoTracking() on d.MobileNo equals p.MobileNo
             where d.Uid == id
             select new ProviderDocumentDetailsVm
             {
                 Uid = d.Uid,
                 ProviderUid = d.ProviderUid,
+                MobileNo = d.MobileNo,
                 ProviderName = p.FullName,
                 ProfilePhotoPath = d.ProfilePhotoPath,
                 CnicFrontImagePath = d.CnicFrontImagePath,
                 CnicBackImagePath = d.CnicBackImagePath,
-                IsVerified = d.IsVerified,
+                IsVerified = p.IsVerified,
                 VerifiedOn = d.VerifiedOn,
                 VerifiedBy = d.VerifiedBy,
                 VerificationRemarks = d.VerificationRemarks,
@@ -144,14 +150,20 @@ public class ProviderDocumentService : IProviderDocumentService
             .FirstOrDefaultAsync(d => d.Uid == id, cancellationToken);
         if (entity == null) return null;
 
+        var providerVerified = await _db.Providers.AsNoTracking()
+            .Where(p => p.Uid == entity.ProviderUid)
+            .Select(p => p.IsVerified)
+            .FirstOrDefaultAsync(cancellationToken);
+
         return await PopulateFormAsync(new ProviderDocumentFormVm
         {
             Uid = entity.Uid,
             ProviderUid = entity.ProviderUid,
+            MobileNo = entity.MobileNo,
             ExistingProfilePhotoPath = entity.ProfilePhotoPath,
             ExistingCnicFrontPath = entity.CnicFrontImagePath,
             ExistingCnicBackPath = entity.CnicBackImagePath,
-            IsVerified = entity.IsVerified,
+            IsVerified = providerVerified,
             VerificationRemarks = entity.VerificationRemarks
         }, cancellationToken);
     }
@@ -160,17 +172,18 @@ public class ProviderDocumentService : IProviderDocumentService
     {
         return await (
             from d in _db.ProviderDocuments.AsNoTracking()
-            join p in _db.Providers.AsNoTracking() on d.ProviderUid equals p.Uid
+            join p in _db.Providers.AsNoTracking() on d.MobileNo equals p.MobileNo
             where d.Uid == id
             select new ProviderDocumentDeleteVm
             {
                 Uid = d.Uid,
                 ProviderUid = d.ProviderUid,
+                MobileNo = d.MobileNo,
                 ProviderName = p.FullName,
                 ProfilePhotoPath = d.ProfilePhotoPath,
                 CnicFrontImagePath = d.CnicFrontImagePath,
                 CnicBackImagePath = d.CnicBackImagePath,
-                IsVerified = d.IsVerified
+                IsVerified = p.IsVerified
             }).FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -178,12 +191,16 @@ public class ProviderDocumentService : IProviderDocumentService
         ProviderDocumentFormVm model,
         CancellationToken cancellationToken = default)
     {
-        if (!await _db.Providers.AnyAsync(p => p.Uid == model.ProviderUid, cancellationToken))
+        var provider = await _db.Providers.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Uid == model.ProviderUid, cancellationToken);
+        if (provider == null)
         {
             return (false, "Selected provider does not exist.");
         }
 
-        if (await _db.ProviderDocuments.AnyAsync(d => d.ProviderUid == model.ProviderUid, cancellationToken))
+        if (await _db.ProviderDocuments.AnyAsync(
+                d => d.ProviderUid == model.ProviderUid || d.MobileNo == provider.MobileNo,
+                cancellationToken))
         {
             return (false, "This provider already has a documents record. Edit the existing one instead.");
         }
@@ -210,6 +227,7 @@ public class ProviderDocumentService : IProviderDocumentService
         var entity = new ProviderDocument
         {
             ProviderUid = model.ProviderUid,
+            MobileNo = provider.MobileNo,
             ProfilePhotoPath = profile.RelativePath,
             CnicFrontImagePath = front.RelativePath,
             CnicBackImagePath = back.RelativePath,
@@ -219,7 +237,10 @@ public class ProviderDocumentService : IProviderDocumentService
 
         _db.ProviderDocuments.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Admin created ProviderDocuments for provider {ProviderUid}", model.ProviderUid);
+        _logger.LogInformation(
+            "Admin created ProviderDocuments for provider {ProviderUid} / {MobileNo}",
+            model.ProviderUid,
+            provider.MobileNo);
         return (true, null);
     }
 
@@ -268,22 +289,10 @@ public class ProviderDocumentService : IProviderDocumentService
             return (false, "All three images (profile, CNIC front, CNIC back) must be present.");
         }
 
-        var wasVerified = entity.IsVerified;
-        entity.IsVerified = model.IsVerified;
+        // Verification is managed only from the Service Providers page (IsVerified toggle).
         entity.VerificationRemarks = string.IsNullOrWhiteSpace(model.VerificationRemarks)
             ? null
             : model.VerificationRemarks.Trim();
-
-        if (model.IsVerified)
-        {
-            entity.VerifiedOn = DateTime.Now;
-            entity.VerifiedBy = verifiedByUserId;
-        }
-        else if (wasVerified)
-        {
-            entity.VerifiedOn = DateTime.Now;
-            entity.VerifiedBy = verifiedByUserId;
-        }
 
         entity.UpdatedOn = DateTime.Now;
         await _db.SaveChangesAsync(cancellationToken);
@@ -299,13 +308,16 @@ public class ProviderDocumentService : IProviderDocumentService
         var entity = await _db.ProviderDocuments.FirstOrDefaultAsync(d => d.Uid == id, cancellationToken);
         if (entity == null) return (false, "Document record not found.");
 
-        entity.IsVerified = true;
+        var provider = await _db.Providers.FirstOrDefaultAsync(p => p.Uid == entity.ProviderUid, cancellationToken);
+        if (provider == null) return (false, "Provider not found.");
+
+        provider.IsVerified = true;
         entity.VerifiedOn = DateTime.Now;
         entity.VerifiedBy = verifiedByUserId;
         entity.UpdatedOn = DateTime.Now;
 
         await _db.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Admin verified ProviderDocuments UID {Uid}", entity.Uid);
+        _logger.LogInformation("Admin verified provider {ProviderUid} via documents UID {Uid}", entity.ProviderUid, entity.Uid);
         return (true, null);
     }
 

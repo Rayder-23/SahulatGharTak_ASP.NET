@@ -114,6 +114,7 @@ public class AppDbContext : DbContext
             entity.HasKey(e => e.Uid);
             entity.Property(e => e.Uid).HasColumnName("UID");
             entity.Property(e => e.UserUid).HasColumnName("UserUID");
+            entity.Property(e => e.MobileNo).HasMaxLength(20).IsRequired();
             entity.Property(e => e.FullName).HasMaxLength(150).IsRequired();
             entity.Property(e => e.Cnic).HasMaxLength(15).HasColumnName("CNIC").IsRequired();
             entity.Property(e => e.Gender).HasMaxLength(20);
@@ -135,6 +136,9 @@ public class AppDbContext : DbContext
                 .HasColumnType("datetime")
                 .HasDefaultValueSql("(getdate())");
             entity.Property(e => e.CategoryUid).HasColumnName("CategoryUID");
+
+            entity.HasAlternateKey(e => e.MobileNo)
+                .HasName("AK_Providers_MobileNo");
 
             entity.HasOne(e => e.User)
                 .WithOne(u => u.Provider)
@@ -423,6 +427,7 @@ public class AppDbContext : DbContext
             entity.HasKey(e => e.Uid);
             entity.Property(e => e.Uid).HasColumnName("UID");
             entity.Property(e => e.ProviderUid).HasColumnName("ProviderUID");
+            entity.Property(e => e.MobileNo).HasMaxLength(20).IsRequired();
             entity.Property(e => e.ProfilePhotoPath).HasMaxLength(500);
             entity.Property(e => e.CnicFrontImagePath).HasColumnName("CNICFrontImagePath").HasMaxLength(500);
             entity.Property(e => e.CnicBackImagePath).HasColumnName("CNICBackImagePath").HasMaxLength(500);
@@ -439,11 +444,24 @@ public class AppDbContext : DbContext
                 .IsUnique()
                 .HasDatabaseName("UQ_ProviderDocuments_ProviderUID");
 
+            entity.HasIndex(e => e.MobileNo)
+                .IsUnique()
+                .HasDatabaseName("UQ_ProviderDocuments_MobileNo");
+
             entity.HasOne(e => e.Provider)
                 .WithMany()
                 .HasForeignKey(e => e.ProviderUid)
                 .HasConstraintName("FK_ProviderDocuments_Providers")
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Alternate-key join for admin (1:1). Restrict delete to avoid multiple cascade paths;
+            // ON UPDATE CASCADE is applied in the migration SQL so mobile renames sync.
+            entity.HasOne<Provider>()
+                .WithMany()
+                .HasForeignKey(e => e.MobileNo)
+                .HasPrincipalKey(p => p.MobileNo)
+                .HasConstraintName("FK_ProviderDocuments_Providers_MobileNo")
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<AdminNotification>(entity =>

@@ -213,6 +213,7 @@ public class UserService : IUserService
                 _db.Providers.Add(new Provider
                 {
                     UserUid = user.Uid,
+                    MobileNo = mobile,
                     FullName = fullName,
                     Cnic = model.Cnic!.Trim(),
                     CategoryUid = model.CategoryUid!.Value,
@@ -312,6 +313,7 @@ public class UserService : IUserService
             user.Provider.FullName = fullName;
             user.Provider.Cnic = model.Cnic!.Trim();
             user.Provider.CategoryUid = model.CategoryUid!.Value;
+            user.Provider.MobileNo = mobile; // ON UPDATE CASCADE syncs ProviderDocuments.MobileNo
         }
         else if (user.Staff != null)
         {

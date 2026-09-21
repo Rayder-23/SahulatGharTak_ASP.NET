@@ -53,6 +53,15 @@
             </div>
             <div class="col-md-6">
                 <div class="row g-2">
+                    <div class="col-sm-4 pd-label">Mobile</div>
+                    <div class="col-sm-8 pd-value">@Model.MobileNo</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-2 mb-2">
+            <div class="col-md-6">
+                <div class="row g-2">
                     <div class="col-sm-4 pd-label">Status</div>
                     <div class="col-sm-8 pd-value">
                         @if (Model.IsVerified)
@@ -107,18 +116,6 @@
             </div>
             <div class="col-md-6"></div>
         </div>
-
-        @if (!Model.IsVerified)
-        {
-            <div class="d-flex justify-content-end mb-2">
-                <form asp-action="Verify" asp-route-id="@Model.Uid" method="post" class="d-inline" onsubmit="return confirm('Verify this provider\'s documents?');">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-success btn-sm">
-                        <i class="fa-solid fa-check me-1"></i>Verify
-                    </button>
-                </form>
-            </div>
-        }
 
         <div class="row g-2 mb-2">
             <div class="col-md-6">

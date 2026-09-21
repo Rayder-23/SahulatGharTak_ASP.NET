@@ -42,6 +42,13 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
         var existing = await _repository.GetByProviderUidAsync(request.ProviderUid, cancellationToken);
         var isFirstSubmission = existing == null;
 
+        var mobileNo = existing?.MobileNo
+            ?? await _repository.GetProviderMobileNoAsync(request.ProviderUid, cancellationToken);
+        if (string.IsNullOrWhiteSpace(mobileNo))
+        {
+            return (false, "Provider mobile number is missing.", null, StatusCodes.Status400BadRequest);
+        }
+
         // First-time registration (no documents row yet) must supply all three files.
         // Once a documents row exists, any slot may be omitted to leave it unchanged.
         if (isFirstSubmission)
@@ -134,6 +141,7 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
             var document = new ProviderDocument
             {
                 ProviderUid = request.ProviderUid,
+                MobileNo = mobileNo,
                 ProfilePhotoPath = profilePath,
                 CnicFrontImagePath = frontPath,
                 CnicBackImagePath = backPath,
@@ -153,19 +161,16 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
             existing.ProfilePhotoPath = profilePath;
             existing.CnicFrontImagePath = frontPath;
             existing.CnicBackImagePath = backPath;
+            existing.MobileNo = mobileNo;
 
-            // Replacing a CNIC image resets verification until admin re-approves,
-            // since that's the document a human actually checks. A profile photo
-            // swap alone does not reset it - it's validated live by on-device face
-            // detection at capture time, so it never needed manual review, and
-            // forcing a full re-verification loop for a simple selfie update would
-            // needlessly lock an already-verified provider out of the dashboard.
+            // Replacing a CNIC image resets Providers.IsVerified until admin re-approves.
+            // Profile photo alone does not reset verification.
             if (request.CnicFront != null || request.CnicBack != null)
             {
-                existing.IsVerified = false;
                 existing.VerifiedOn = null;
                 existing.VerifiedBy = null;
                 existing.VerificationRemarks = null;
+                await _repository.SetProviderIsVerifiedAsync(request.ProviderUid, false, cancellationToken);
             }
             existing.UpdatedOn = now;
 
@@ -196,7 +201,8 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
             return (false, "Provider documents not found.", null, StatusCodes.Status404NotFound);
         }
 
-        return (true, null, MapToDto(document), StatusCodes.Status200OK);
+        var providerVerified = await _repository.GetProviderIsVerifiedAsync(providerUid, cancellationToken) ?? false;
+        return (true, null, MapToDto(document, providerVerified), StatusCodes.Status200OK);
     }
 
     public async Task<(bool Success, string? Error, int StatusCode)> DeleteDocumentsAsync(
@@ -258,7 +264,9 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
             return (false, "Provider documents not found.", null, StatusCodes.Status404NotFound);
         }
 
-        document.IsVerified = request.IsVerified;
+        await _repository.SetProviderIsVerifiedAsync(request.ProviderUid, request.IsVerified, cancellationToken);
+
+        // Audit fields stay on the documents row; status is Providers.IsVerified.
         document.VerifiedBy = request.VerifiedBy;
         document.VerificationRemarks = string.IsNullOrWhiteSpace(request.VerificationRemarks)
             ? null
@@ -269,21 +277,21 @@ public class ProviderDocumentsApiService : IProviderDocumentsApiService
         await _repository.UpdateAsync(document, cancellationToken);
 
         _logger.LogInformation(
-            "Provider {ProviderUid} documents verification set to {IsVerified} by {VerifiedBy}",
+            "Provider {ProviderUid} verification set to {IsVerified} by {VerifiedBy}",
             request.ProviderUid,
             request.IsVerified,
             request.VerifiedBy);
 
-        return (true, null, MapToDto(document), StatusCodes.Status200OK);
+        return (true, null, MapToDto(document, request.IsVerified), StatusCodes.Status200OK);
     }
 
-    private static ProviderDocumentsApiDto MapToDto(ProviderDocument document) => new()
+    private static ProviderDocumentsApiDto MapToDto(ProviderDocument document, bool providerIsVerified) => new()
     {
         ProviderUid = document.ProviderUid,
         ProfilePhotoPath = document.ProfilePhotoPath,
         CnicFrontImagePath = document.CnicFrontImagePath,
         CnicBackImagePath = document.CnicBackImagePath,
-        IsVerified = document.IsVerified,
+        IsVerified = providerIsVerified,
         VerifiedOn = document.VerifiedOn,
         VerifiedBy = document.VerifiedBy,
         VerificationRemarks = document.VerificationRemarks,

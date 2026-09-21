@@ -7,8 +7,8 @@ public class CustomerListVm
 {
     public List<CustomerItemVm> Items { get; set; } = new();
     public string? Search { get; set; }
-    public string Sort { get; set; } = "name";
-    public string SortDir { get; set; } = "asc";
+    public string Sort { get; set; } = "id";
+    public string SortDir { get; set; } = "desc";
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 10;
     public int TotalCount { get; set; }
