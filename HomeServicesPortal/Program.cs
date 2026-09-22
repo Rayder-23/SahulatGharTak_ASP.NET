@@ -59,6 +59,7 @@ builder.Services.AddScoped<IServiceCategoryService, ServiceCategoryService>();
 builder.Services.AddScoped<IServiceTitleService, ServiceTitleService>();
 builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
 builder.Services.AddScoped<IServiceProviderService, ServiceProviderService>();
+builder.Services.AddScoped<IProviderCategoryService, ProviderCategoryService>();
 builder.Services.AddScoped<IProviderLocationService, ProviderLocationService>();
 builder.Services.AddScoped<IProviderAvailabilityService, ProviderAvailabilityService>();
 builder.Services.AddScoped<IProviderDetailService, ProviderDetailService>();

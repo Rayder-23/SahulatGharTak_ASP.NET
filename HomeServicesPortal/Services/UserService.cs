@@ -210,7 +210,7 @@ public class UserService : IUserService
             }
             else if (userType == UserTypeConstants.Provider)
             {
-                _db.Providers.Add(new Provider
+                var newProvider = new Provider
                 {
                     UserUid = user.Uid,
                     MobileNo = mobile,
@@ -219,6 +219,16 @@ public class UserService : IUserService
                     CategoryUid = model.CategoryUid!.Value,
                     CreatedOn = DateTime.Now,
                     IsAvailable = true
+                };
+                _db.Providers.Add(newProvider);
+                await _db.SaveChangesAsync(cancellationToken);
+
+                _db.ProviderCategories.Add(new ProviderCategory
+                {
+                    ProviderUid = newProvider.Uid,
+                    CategoryUid = model.CategoryUid!.Value,
+                    IsPrimary = true,
+                    CreatedOn = DateTime.Now
                 });
             }
             else
@@ -312,7 +322,6 @@ public class UserService : IUserService
         {
             user.Provider.FullName = fullName;
             user.Provider.Cnic = model.Cnic!.Trim();
-            user.Provider.CategoryUid = model.CategoryUid!.Value;
             user.Provider.MobileNo = mobile; // ON UPDATE CASCADE syncs ProviderDocuments.MobileNo
         }
         else if (user.Staff != null)
@@ -323,6 +332,46 @@ public class UserService : IUserService
         }
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        if (user.Provider != null)
+        {
+            // Keep the deprecated CategoryUid scalar and ProviderCategories junction in sync —
+            // this screen only edits the provider's primary category.
+            var providerUid = user.Provider.Uid;
+            var categoryUid = model.CategoryUid!.Value;
+
+            await _db.Providers
+                .Where(p => p.Uid == providerUid)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.CategoryUid, categoryUid), cancellationToken);
+
+            await _db.ProviderCategories
+                .Where(pc => pc.ProviderUid == providerUid && pc.IsPrimary && pc.CategoryUid != categoryUid)
+                .ExecuteUpdateAsync(s => s.SetProperty(pc => pc.IsPrimary, false), cancellationToken);
+
+            var existingRow = await _db.ProviderCategories
+                .FirstOrDefaultAsync(pc => pc.ProviderUid == providerUid && pc.CategoryUid == categoryUid, cancellationToken);
+
+            if (existingRow != null)
+            {
+                if (!existingRow.IsPrimary)
+                {
+                    existingRow.IsPrimary = true;
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+            }
+            else
+            {
+                _db.ProviderCategories.Add(new ProviderCategory
+                {
+                    ProviderUid = providerUid,
+                    CategoryUid = categoryUid,
+                    IsPrimary = true,
+                    CreatedOn = DateTime.Now
+                });
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
         _logger.LogInformation("UsersLogin {Uid} updated.", user.Uid);
         return (true, Array.Empty<string>());
     }

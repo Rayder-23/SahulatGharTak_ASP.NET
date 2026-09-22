@@ -217,16 +217,96 @@ public class ServiceBookingApiService : IServiceBookingApiService
         string passcode,
         decimal actualAmountPaid,
         string? paymentMode,
+        decimal? labourAmount = null,
+        List<VerifyCompletionMaterialItemDto>? materialItems = null,
         CancellationToken cancellationToken = default)
     {
         var (success, error) = await _bookingService.VerifyCompletionPasscodeAsync(
-            bookingUid, providerUid, passcode, actualAmountPaid, paymentMode, cancellationToken);
+            bookingUid, providerUid, passcode, actualAmountPaid, paymentMode, labourAmount, materialItems, cancellationToken);
         if (!success)
         {
             return (false, error, null);
         }
 
         return await GetBookingByIdAsync(bookingUid, providerUid, cancellationToken);
+    }
+
+    public async Task<(bool Success, string? Error, List<BookingMaterialItemApiDto>? Data)> GetMaterialItemsAsync(
+        int bookingUid,
+        CancellationToken cancellationToken = default)
+    {
+        var exists = await _db.ServiceBookings.AsNoTracking().AnyAsync(b => b.Uid == bookingUid, cancellationToken);
+        if (!exists)
+        {
+            return (false, "Booking not found.", null);
+        }
+
+        var items = await _db.BookingMaterialItems
+            .AsNoTracking()
+            .Where(i => i.BookingUid == bookingUid)
+            .OrderBy(i => i.Uid)
+            .Select(i => new BookingMaterialItemApiDto
+            {
+                ItemName = i.ItemName,
+                Quantity = i.Quantity,
+                UnitPrice = i.UnitPrice,
+                Amount = i.Amount
+            })
+            .ToListAsync(cancellationToken);
+
+        return (true, null, items);
+    }
+
+    public async Task<(bool Success, string? Error, List<BookingMaterialItemApiDto>? Data)> UpdateMaterialItemsAsync(
+        int bookingUid,
+        List<VerifyCompletionMaterialItemDto> materialItems,
+        CancellationToken cancellationToken = default)
+    {
+        var booking = await _db.ServiceBookings.FirstOrDefaultAsync(b => b.Uid == bookingUid, cancellationToken);
+        if (booking == null)
+        {
+            return (false, "Booking not found.", null);
+        }
+
+        var existing = await _db.BookingMaterialItems
+            .Where(i => i.BookingUid == bookingUid)
+            .ToListAsync(cancellationToken);
+        if (existing.Count > 0)
+        {
+            _db.BookingMaterialItems.RemoveRange(existing);
+        }
+
+        foreach (var item in (materialItems ?? new List<VerifyCompletionMaterialItemDto>())
+                 .Where(i => !string.IsNullOrWhiteSpace(i.ItemName)))
+        {
+            var quantity = item.Quantity <= 0 ? 1 : item.Quantity;
+            _db.BookingMaterialItems.Add(new BookingMaterialItem
+            {
+                BookingUid = bookingUid,
+                ItemName = item.ItemName.Trim(),
+                Quantity = quantity,
+                UnitPrice = item.UnitPrice,
+                Amount = Math.Round(quantity * item.UnitPrice, 2),
+                CreatedOn = DateTime.Now
+            });
+        }
+
+        // Recompute FinalAmount/CustomerRemaining from the new material total — commission is
+        // unaffected (it's LabourAmount-based, not tied to materials).
+        var materialTotal = await _db.BookingMaterialItems
+            .Where(i => i.BookingUid == bookingUid)
+            .SumAsync(i => (decimal?)i.Amount, cancellationToken) ?? 0m;
+
+        // Recompute using the currently-saved base charges (Estimated/Visit/Additional/Deductions
+        // + Labour), matching BookingService's ComputeFinalBill formula.
+        booking.FinalAmount = Math.Round(
+            booking.EstimatedAmount + (booking.LabourAmount ?? 0) + materialTotal
+                + booking.VisitCharges + booking.AdditionalCharges - booking.Deductions, 2);
+        booking.CustomerRemaining = Math.Round(booking.FinalAmount - booking.CustomerPaid, 2);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await GetMaterialItemsAsync(bookingUid, cancellationToken);
     }
 
     private static readonly string[] ContactVisibleStatuses = ["Accepted", "In Progress", "Completed", "Closed"];

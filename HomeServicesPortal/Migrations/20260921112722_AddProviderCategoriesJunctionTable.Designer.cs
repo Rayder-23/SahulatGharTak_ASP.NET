@@ -4,6 +4,7 @@ using HomeServicesPortal.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HomeServicesPortal.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260921112722_AddProviderCategoriesJunctionTable")]
+    partial class AddProviderCategoriesJunctionTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -70,47 +73,6 @@ namespace HomeServicesPortal.Migrations
                         .HasDatabaseName("IX_AdminNotifications_IsRead_CreatedOn");
 
                     b.ToTable("AdminNotifications", (string)null);
-                });
-
-            modelBuilder.Entity("HomeServicesPortal.Entities.BookingMaterialItem", b =>
-                {
-                    b.Property<int>("Uid")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("UID");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Uid"));
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<int>("BookingUid")
-                        .HasColumnType("int")
-                        .HasColumnName("BookingUID");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getdate())");
-
-                    b.Property<string>("ItemName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<decimal>("Quantity")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(10,2)")
-                        .HasDefaultValue(1m);
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.HasKey("Uid");
-
-                    b.HasIndex("BookingUid");
-
-                    b.ToTable("BookingMaterialItems", (string)null);
                 });
 
             modelBuilder.Entity("HomeServicesPortal.Entities.Client", b =>
@@ -784,9 +746,6 @@ namespace HomeServicesPortal.Migrations
                     b.Property<decimal>("FinalAmount")
                         .HasColumnType("decimal(12,2)");
 
-                    b.Property<decimal?>("LabourAmount")
-                        .HasColumnType("decimal(12,2)");
-
                     b.Property<string>("Passcode")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
@@ -1075,18 +1034,6 @@ namespace HomeServicesPortal.Migrations
                     b.ToTable("UsersLogin", (string)null);
                 });
 
-            modelBuilder.Entity("HomeServicesPortal.Entities.BookingMaterialItem", b =>
-                {
-                    b.HasOne("HomeServicesPortal.Entities.ServiceBooking", "Booking")
-                        .WithMany("MaterialItems")
-                        .HasForeignKey("BookingUid")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_BookingMaterialItems_ServiceBookings");
-
-                    b.Navigation("Booking");
-                });
-
             modelBuilder.Entity("HomeServicesPortal.Entities.Client", b =>
                 {
                     b.HasOne("HomeServicesPortal.Entities.UsersLogin", "User")
@@ -1332,11 +1279,6 @@ namespace HomeServicesPortal.Migrations
             modelBuilder.Entity("HomeServicesPortal.Entities.Service", b =>
                 {
                     b.Navigation("Categories");
-                });
-
-            modelBuilder.Entity("HomeServicesPortal.Entities.ServiceBooking", b =>
-                {
-                    b.Navigation("MaterialItems");
                 });
 
             modelBuilder.Entity("HomeServicesPortal.Entities.ServiceCategory", b =>
