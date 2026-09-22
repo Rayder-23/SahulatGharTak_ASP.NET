@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to every coding agent when working with code in this repository.
+This file provides guidance to every coding agent when working with code in this repository. CLAUDE.md points here; every coding agent reads this file first.
 
 ## Project overview
 
