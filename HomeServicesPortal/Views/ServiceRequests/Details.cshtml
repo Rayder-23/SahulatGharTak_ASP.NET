@@ -77,7 +77,7 @@
                     </div>
                     <div class="row g-3 mb-3">
                         <div class="col-md-3 sr-title">Created On</div>
-                        <div class="col-md-3 sr-field">@(Model.RequestDate?.ToString("dd MMM yyyy HH:mm") ?? "—")</div>
+                        <div class="col-md-3 sr-field">@(Model.RequestDate.ToPktString("dd MMM yyyy HH:mm"))</div>
                         <div class="col-md-3 sr-title">Status</div>
                         <div class="col-md-3 sr-field"><span class="badge bg-@statusClass">@(Model.Status ?? "Initiated")</span></div>
                     </div>

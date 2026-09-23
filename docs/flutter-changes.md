@@ -83,3 +83,16 @@ Note on flow: there is no standalone "register as provider" screen — the app r
   - `HomeServicesPortal/Services/AuthService.cs` (`RegisterProviderAsync`) — the `multiCategoryRequested` branch and the legacy single-`ResolveCategoryAsync` fallback can be collapsed to always require the multi-category path.
   - `api.txt`'s `POST Register Provider` section — the "current/legacy app" request-body example and its explanatory Notes bullets can be deleted, leaving only the `categoryIds`/`primaryCategoryId` shape as the sole documented contract. Bump `api.txt`'s version header when that cleanup lands.
   - Once `CategoryUid` scalar reads are fully migrated off (see `db.txt`'s `Providers.CategoryUID` deprecation note), the column itself can be dropped in a further fast-follow — out of scope for the app-facing cleanup above.
+
+---
+
+## Timezone — UTC "Z" suffix fix on API DateTime fields
+
+**Status: backend implemented and live (non-breaking, no shape change). Not yet confirmed adopted in-app.**
+
+- **What changed**: every `DateTime` field in every API response is still UTC (this was already true), but now serializes with an explicit ISO-8601 "Z" suffix (e.g. `"2026-09-22T11:29:43.137Z"` instead of `"2026-09-22T11:29:43.137"`). Root cause: EF Core returns SQL Server `datetime` columns as `Kind=Unspecified`, so the default JSON serializer previously omitted the UTC marker — added a global `UtcDateTimeJsonConverter` (`HomeServicesPortal/Models/Api/UtcDateTimeJsonConverter.cs`, registered in `Program.cs`) that fixes this for every outbound `DateTime` across all API DTOs.
+- **Why**: confirmed live that the admin portal was displaying raw UTC values unconverted (e.g. a request submitted at 4:29 PM Pakistan time showed as 11:29 AM) — the missing "Z" suffix meant the Flutter app likely has/had the same issue if it was ever displaying these timestamps without first converting from UTC.
+- **No field/shape change** — only the string format of existing `DateTime` values changes (gains "Z"). No new fields, no renamed fields, nothing to opt into.
+- **Recommended app change (whenever convenient, no urgency, but worth checking)**: audit anywhere the app parses/displays a `DateTime` string from an API response — ensure it's parsed as UTC (`DateTime.parse(str)` in Dart already respects a trailing "Z" and marks the result as UTC automatically) and converted with `.toLocal()` (or an explicit Pakistan-time conversion) before display, rather than treated as an already-local string. If the app was previously naively displaying these raw strings, this fix means the *correct* fix is now possible client-side — but the app still needs to actually call `.toLocal()`/convert, since the raw value was always UTC and still is.
+- Admin portal side of this same fix: all `.cshtml` views now convert UTC → PKT (UTC+5) via a new `Helpers/PktTimeHelper.cs` before rendering — not applicable to the Flutter app, mentioned here only for context.
+- See `api.txt`'s "DateTime fields" note (top of file, under the header) and `db.txt`'s TIMEZONE STANDARD note (v4.8) for the full backend-side writeup.

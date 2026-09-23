@@ -1,6 +1,13 @@
-# Version: 4.6 | UpdatedAt: 21/09/2026
+# Version: 4.8 | UpdatedAt: 23/09/2026
 # Database: SahulatAppDB
 # Server: 34.131.41.192,1433
+#
+# TIMEZONE STANDARD (2026-09-23): All 18 CreatedOn DEFAULT constraints now use getutcdate(), not
+# getdate() (was a latent bug — only correct before because server OS clock is UTC). No data
+# changed. Storage stays UTC everywhere. Display conversion to PKT (UTC+5) happens at the admin
+# portal via Helpers/PktTimeHelper.cs (ToPkt/ToPktString extension methods); API responses carry
+# explicit UTC "Z"-suffixed timestamps (UtcDateTimeJsonConverter, registered globally in
+# Program.cs) for the Flutter app to convert client-side. See api.txt for the API-side note.
 
 ================================================================================
 CORE TABLES (Live Schema)
@@ -15,7 +22,7 @@ Table: UsersLogin
   UserType         nvarchar(20)     NOT NULL
   IsActive         bit              NOT NULL  DEFAULT (1)
   IsVerified       bit              NOT NULL  DEFAULT (0)
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
   LastLogin        datetime         NULL
 
 --------------------------------------------------------------------------------
@@ -29,7 +36,7 @@ Table: UserOTP
   IsVerified       bit              NOT NULL  DEFAULT (0)  INDEX IX_UserOTP_IsVerified
   AttemptCount     int              NOT NULL  DEFAULT (0)
   SentCount        int              NOT NULL  DEFAULT (0)
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
   VerifiedOn       datetime         NULL
   -- No FK to UsersLogin: Registration OTP is issued before a UsersLogin row exists.
   -- MobileNo is the natural lookup key for all OTP flows (API owns generation/expiry/limits).
@@ -46,7 +53,7 @@ Table: Clients
   Comments         nvarchar(1000)   NULL  -- internal comments
   City             nvarchar(100)    NULL  -- primary city
   Location         nvarchar(250)    NULL  -- area / location text
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
 
 --------------------------------------------------------------------------------
 Table: Services
@@ -56,7 +63,7 @@ Table: Services
   Description      nvarchar(500)    NULL
   DisplayOrder     int              NOT NULL  DEFAULT (0)
   IsActive         bit              NOT NULL  DEFAULT (1)
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
 
 --------------------------------------------------------------------------------
 Table: ServiceCategories
@@ -66,7 +73,7 @@ Table: ServiceCategories
   CategoryName     nvarchar(100)    NOT NULL
   Description      nvarchar(500)    NULL
   IsActive         bit              NOT NULL  DEFAULT (1)
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
 
 --------------------------------------------------------------------------------
 Table: ServiceTitles
@@ -79,7 +86,7 @@ Table: ServiceTitles
                                            -- CustomerServiceRequests.EstimatedBudget server-side
   DisplayOrder     int              NOT NULL  DEFAULT (0)
   IsActive         bit              NOT NULL  DEFAULT (1)
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
 
 --------------------------------------------------------------------------------
 Table: Providers
@@ -98,7 +105,7 @@ Table: Providers
   TotalReviews     int              NOT NULL  DEFAULT (0)
   TotalJobsCompleted int            NOT NULL  DEFAULT (0)
   IsAvailable      bit              NOT NULL  DEFAULT (1)
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
   CategoryUID      int              NOT NULL
   -- DEPRECATED (2026-09-21): mirrors the IsPrimary=1 row in ProviderCategories below. Do not
   -- add new dependencies on this column for category matching/membership — read/write via
@@ -124,7 +131,7 @@ Table: ProviderCategories
   ProviderUID      int              NOT NULL  FK -> Providers.UID (cascade delete)
   CategoryUID      int              NOT NULL  FK -> ServiceCategories.UID
   IsPrimary        bit              NOT NULL  DEFAULT (0)
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
   -- Source of truth for provider multi-category membership (added 2026-09-21). One row per
   -- (ProviderUID, CategoryUID) pair, unique constraint UQ_ProviderCategories_ProviderUID_CategoryUID.
   -- Exactly one row per provider should have IsPrimary=1, kept in sync with the deprecated
@@ -150,7 +157,7 @@ Table: ProviderDocuments
   VerifiedOn           datetime         NULL
   VerifiedBy           int              NULL
   VerificationRemarks  nvarchar(500)    NULL
-  CreatedOn            datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn            datetime         NOT NULL  DEFAULT (getutcdate())
   UpdatedOn            datetime         NULL
   -- Relative paths only (e.g. uploads/providers/125/profile.jpg). One row per provider.
   -- Indexes: IX_ProviderDocuments_CreatedOn, IX_ProviderDocuments_MissingProfilePhoto (filtered),
@@ -166,7 +173,7 @@ Table: AdminNotifications
   LinkUrl              nvarchar(300)    NULL
   RelatedEntityUID     int              NULL
   IsRead               bit              NOT NULL  DEFAULT (0)
-  CreatedOn            datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn            datetime         NOT NULL  DEFAULT (getutcdate())
   -- Admin portal bell notifications, one shared table, distinguished by Type. Three
   -- independently-badged admin-portal icons filter this table by Type via a ?type= query
   -- param on GET .../feed, GET .../unread-count, POST .../mark-read (comma-separated for
@@ -184,7 +191,7 @@ Table: Configurations
   UID              int              NOT NULL  PK  IDENTITY
   ConfigKey        nvarchar(100)    NOT NULL  UNIQUE  -- e.g. Cities
   ConfigValue      nvarchar(MAX)    NOT NULL  -- comma-separated multi-values
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
   -- Example: ConfigKey=Cities, ConfigValue=Karachi, Islamabad, Faisalabad, Lahore, ...
 
 --------------------------------------------------------------------------------
@@ -196,7 +203,7 @@ Table: Staff
   Designation      nvarchar(100)    NULL
   Department       nvarchar(100)    NULL
   IsAdmin          bit              NOT NULL  DEFAULT (0)
-  CreatedOn        datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn        datetime         NOT NULL  DEFAULT (getutcdate())
 
 --------------------------------------------------------------------------------
 Table: ClientAddresses
@@ -231,7 +238,7 @@ Table: CustomerServiceRequests
   -- Legacy "Pending" was renamed to Initiated (2026-09-07)
   Remarks              nvarchar(500)    NULL
   CancelReason         nvarchar(500)    NULL  -- set when client cancels (Status=Cancelled)
-  CreatedOn            datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn            datetime         NOT NULL  DEFAULT (getutcdate())
 
 --------------------------------------------------------------------------------
 Table: ServiceBookings
@@ -272,7 +279,7 @@ Table: ServiceBookings
                                                    -- booking that was auto-superseded because another fanned-out provider accepted first
                                                    -- (first-accept-wins; see BookingService.RespondToAssignmentAsync)
   RejectReason         nvarchar(500)    NULL      -- set when provider rejects a Pending booking
-  CreatedOn            datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn            datetime         NOT NULL  DEFAULT (getutcdate())
   -- Finance post (auto when Status=Completed):
   --   PaymentLedger: Company/Credit/Commission, Provider/Credit/JobEarning,
   --                  CustPayment (OnlineToCompany) or CashCollect (CashToProvider)
@@ -288,7 +295,7 @@ Table: BookingMaterialItems
   Quantity             decimal(10,2)    NOT NULL  DEFAULT (1)
   UnitPrice            decimal(10,2)    NOT NULL
   Amount               decimal(10,2)    NOT NULL  -- Quantity * UnitPrice, stored (not computed) for history
-  CreatedOn            datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn            datetime         NOT NULL  DEFAULT (getutcdate())
   -- Added 2026-09-21. Itemized material-cost breakdown for a booking (e.g. "light bulb", qty 2,
   -- unit price 200). ServiceBookings.FinalAmount includes SUM(Amount) for the booking's rows;
   -- these are NOT commissionable (only ServiceBookings.LabourAmount feeds CommissionAmount).
@@ -307,7 +314,7 @@ Table: CommissionRules
   EffectiveFrom        datetime         NOT NULL
   EffectiveTo          datetime         NULL
   IsActive             bit              NOT NULL  DEFAULT (1)
-  CreatedOn            datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn            datetime         NOT NULL  DEFAULT (getutcdate())
   -- Assign Provider resolves: Provider rule → Category rule → Global rule (active + effective window).
   -- Percentage maps to booking CommissionType=Percent; Fixed maps to Fixed.
 
@@ -321,7 +328,7 @@ Table: PaymentLedger
   EntryType            nvarchar(10)     NOT NULL
   Amount               decimal(12,2)    NOT NULL
   Reason               nvarchar(30)     NOT NULL
-  CreatedOn            datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn            datetime         NOT NULL  DEFAULT (getutcdate())
 
 --------------------------------------------------------------------------------
 Table: ProviderPayouts
@@ -331,7 +338,7 @@ Table: ProviderPayouts
   Amount               decimal(12,2)    NOT NULL
   Status               nvarchar(20)     NOT NULL  DEFAULT ('Pending')
   Method               nvarchar(20)     NULL
-  CreatedOn            datetime         NOT NULL  DEFAULT (getdate())
+  CreatedOn            datetime         NOT NULL  DEFAULT (getutcdate())
   PaidOn               datetime         NULL
 
 

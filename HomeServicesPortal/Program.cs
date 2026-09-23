@@ -206,7 +206,11 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
+    });
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
