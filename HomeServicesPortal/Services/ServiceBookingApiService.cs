@@ -65,48 +65,68 @@ public class ServiceBookingApiService : IServiceBookingApiService
         CreateServiceBookingDto request,
         CancellationToken cancellationToken = default)
     {
-        var alreadyBooked = await _db.ServiceBookings
-            .AnyAsync(b => b.RequestUid == request.RequestUid, cancellationToken);
+        // SERIALIZABLE so a second concurrent CreateBookingAsync call for the same RequestUid
+        // (retried API call, double-tap) blocks on the AnyAsync read inside the transaction until
+        // the first commits/rolls back, instead of both calls seeing "no booking yet" and both
+        // creating one. _bookingService shares this same scoped AppDbContext, so its CreateAsync
+        // write is enlisted in the same transaction. Wrapped in CreateExecutionStrategy().ExecuteAsync
+        // (matches AuthService.ExecuteInTransactionAsync / PaymentService.RecordBookingCompletionAsync)
+        // since EnableRetryOnFailure is on in Development and a bare BeginTransactionAsync throws
+        // under SqlServerRetryingExecutionStrategy — confirmed by testing this locally.
+        var strategy = _db.Database.CreateExecutionStrategy();
 
-        if (alreadyBooked)
+        return await strategy.ExecuteAsync<(bool Success, string? Error, ServiceBookingApiDto? Data)>(async () =>
         {
-            return (false, "This service request already has a booking.", null);
-        }
+            await using var transaction = await _db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable, cancellationToken);
 
-        var form = new BookingFormVm
-        {
-            RequestUid = request.RequestUid,
-            ProviderUid = request.ProviderUid,
-            ServiceDetail = request.ServiceDetail,
-            EstimatedAmount = request.EstimatedAmount,
-            VisitCharges = request.VisitCharges,
-            AdditionalCharges = request.AdditionalCharges,
-            Deductions = request.Deductions,
-            CustomerPaid = request.CustomerPaid,
-            PaymentMode = request.PaymentMode,
-            CommissionType = request.CommissionType,
-            CommissionValue = request.CommissionValue,
-            Status = request.Status
-        };
+            var alreadyBooked = await _db.ServiceBookings
+                .AnyAsync(b => b.RequestUid == request.RequestUid, cancellationToken);
 
-        var (success, error) = await _bookingService.CreateAsync(form, cancellationToken);
-        if (!success)
-        {
-            return (false, error, null);
-        }
+            if (alreadyBooked)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return (false, "This service request already has a booking.", null);
+            }
 
-        var booking = await _db.ServiceBookings
-            .AsNoTracking()
-            .Where(b => b.RequestUid == request.RequestUid)
-            .Select(MapToDtoExpression())
-            .FirstOrDefaultAsync(cancellationToken);
+            var form = new BookingFormVm
+            {
+                RequestUid = request.RequestUid,
+                ProviderUid = request.ProviderUid,
+                ServiceDetail = request.ServiceDetail,
+                EstimatedAmount = request.EstimatedAmount,
+                VisitCharges = request.VisitCharges,
+                AdditionalCharges = request.AdditionalCharges,
+                Deductions = request.Deductions,
+                CustomerPaid = request.CustomerPaid,
+                PaymentMode = request.PaymentMode,
+                CommissionType = request.CommissionType,
+                CommissionValue = request.CommissionValue,
+                Status = request.Status
+            };
 
-        if (booking == null)
-        {
-            return (false, "Booking was created but could not be loaded.", null);
-        }
+            var (success, error) = await _bookingService.CreateAsync(form, cancellationToken);
+            if (!success)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return (false, error, null);
+            }
 
-        return (true, null, booking);
+            await transaction.CommitAsync(cancellationToken);
+
+            var booking = await _db.ServiceBookings
+                .AsNoTracking()
+                .Where(b => b.RequestUid == request.RequestUid)
+                .Select(MapToDtoExpression())
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (booking == null)
+            {
+                return (false, "Booking was created but could not be loaded.", null);
+            }
+
+            return (true, null, booking);
+        });
     }
 
     public async Task<(bool Success, string? Error, ServiceBookingApiDto? Data)> UpdateBookingAsync(

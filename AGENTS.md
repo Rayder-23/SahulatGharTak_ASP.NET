@@ -76,6 +76,16 @@ Cross-cutting:
 
 API controllers return `ApiResponse<T>` (`Models/Api/ApiResponse.cs`) wrapping success/failure + message, not bare data or ASP.NET's default `ValidationProblem`. Model-validation failures are intercepted in `Program.cs` (`ApiBehaviorOptions.InvalidModelStateResponseFactory`) and reshaped into the same `ApiResponse` envelope — follow this convention for any new API controller rather than returning raw `BadRequest(ModelState)`.
 
+### Idempotency
+
+Mobile networks retry. Any endpoint that mutates state and could plausibly be retried (client-side timeout/retry logic, a double-tap, a race between two callers) must be safe to call twice with the same effect as calling it once — this applies whether the retry is a deliberate client retry or two legitimate callers racing (e.g. two providers accepting the same fanned-out job).
+
+- Prefer a **conditional state transition** over check-then-act: guard the mutation on the row's *current* state (`WHERE Status = 'Pending'`, `AnyAsync` guard before inserting ledger rows, etc.) so a second call either no-ops or fails cleanly instead of double-applying an effect (double-charging a ledger, double-decrementing a counter, re-sending a notification).
+- Where two callers can race for the same resource (e.g. first-accept-wins on a fanned-out booking), an atomic conditional update (`ExecuteUpdateAsync` with a `WHERE` on current state, checking the affected row count) is often simpler than a transaction and is `BookingService.cs`'s preferred pattern. A `BeginTransactionAsync` transaction works too (see `AuthService.ExecuteInTransactionAsync`, `PaymentService.RecordBookingCompletionAsync`) but **must** be wrapped in `_db.Database.CreateExecutionStrategy().ExecuteAsync(...)` — `EnableRetryOnFailure` is on in Development (`Program.cs`), and a bare `BeginTransactionAsync` throws `SqlServerRetryingExecutionStrategy does not support user-initiated transactions` there. This is easy to miss since it only surfaces in Development, not Production — verify by actually running the app locally, not just building.
+- A retried call should return the *same successful response* (or a clearly-labeled "already done" response) rather than a generic error — see `POST /api/service-bookings/{id}/respond`'s accept path in `api.txt` for the pattern: same-provider re-accept returns 200 idempotent-success, a losing provider gets a distinct, well-defined 400 rather than a 500 or a silent double-effect.
+- Endpoints that post financial ledger entries (`PaymentService.RecordBookingCompletionAsync` and similar) must guard against being invoked twice for the same source row (e.g. `AnyAsync` check for existing ledger rows before inserting) — a retry must never create a second set of ledger entries for the same booking/transaction.
+- Document the idempotency behavior in `api.txt` next to the endpoint (what a retry does, what a race between two callers does) whenever it isn't the obvious default — don't leave it to be discovered by reading controller code.
+
 ## Deployment
 
 GitHub Actions (`.github/workflows/deploy.yml`): push to `main` → `dotnet publish -c Release` → rsync to a GCP VM → restart the `sahulatghartak` systemd service. Production `appsettings*.json` are excluded from the rsync (preserved on the server). Manual/alternative scripts live under `deploy/gcp/` and `deploy/hostinger/`.

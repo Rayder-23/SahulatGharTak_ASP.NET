@@ -181,80 +181,89 @@ public class UserService : IUserService
                 return (false, new[] { "Selected category was not found." });
         }
 
-        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
-        try
+        // Wrapped in CreateExecutionStrategy().ExecuteAsync (matches AuthService.ExecuteInTransactionAsync
+        // and the PaymentService/OtpService/ServiceBookingApiService fixes) since EnableRetryOnFailure is
+        // on in Development and a bare BeginTransactionAsync throws under SqlServerRetryingExecutionStrategy
+        // — this method previously used a bare BeginTransactionAsync with no execution-strategy wrap, which
+        // would have thrown the same "does not support user-initiated transactions" error in Development.
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<(bool Success, IEnumerable<string> Errors)>(async () =>
         {
-            var user = new UsersLogin
+            await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                MobileNo = mobile,
-                PasswordHash = PasswordHasher.Hash(model.Password),
-                UserType = userType,
-                IsActive = model.IsActive,
-                IsVerified = model.IsVerified,
-                CreatedOn = DateTime.Now
-            };
-
-            _db.UsersLogins.Add(user);
-            await _db.SaveChangesAsync(cancellationToken);
-
-            var fullName = model.FullName.Trim();
-            if (userType == UserTypeConstants.Client)
-            {
-                _db.Clients.Add(new Client
+                var user = new UsersLogin
                 {
-                    UserUid = user.Uid,
-                    FullName = fullName,
-                    Cnic = model.Cnic?.Trim(),
-                    CreatedOn = DateTime.Now
-                });
-            }
-            else if (userType == UserTypeConstants.Provider)
-            {
-                var newProvider = new Provider
-                {
-                    UserUid = user.Uid,
                     MobileNo = mobile,
-                    FullName = fullName,
-                    Cnic = model.Cnic!.Trim(),
-                    CategoryUid = model.CategoryUid!.Value,
-                    CreatedOn = DateTime.Now,
-                    IsAvailable = true
+                    PasswordHash = PasswordHasher.Hash(model.Password),
+                    UserType = userType,
+                    IsActive = model.IsActive,
+                    IsVerified = model.IsVerified,
+                    CreatedOn = DateTime.Now
                 };
-                _db.Providers.Add(newProvider);
+
+                _db.UsersLogins.Add(user);
                 await _db.SaveChangesAsync(cancellationToken);
 
-                _db.ProviderCategories.Add(new ProviderCategory
+                var fullName = model.FullName.Trim();
+                if (userType == UserTypeConstants.Client)
                 {
-                    ProviderUid = newProvider.Uid,
-                    CategoryUid = model.CategoryUid!.Value,
-                    IsPrimary = true,
-                    CreatedOn = DateTime.Now
-                });
+                    _db.Clients.Add(new Client
+                    {
+                        UserUid = user.Uid,
+                        FullName = fullName,
+                        Cnic = model.Cnic?.Trim(),
+                        CreatedOn = DateTime.Now
+                    });
+                }
+                else if (userType == UserTypeConstants.Provider)
+                {
+                    var newProvider = new Provider
+                    {
+                        UserUid = user.Uid,
+                        MobileNo = mobile,
+                        FullName = fullName,
+                        Cnic = model.Cnic!.Trim(),
+                        CategoryUid = model.CategoryUid!.Value,
+                        CreatedOn = DateTime.Now,
+                        IsAvailable = true
+                    };
+                    _db.Providers.Add(newProvider);
+                    await _db.SaveChangesAsync(cancellationToken);
+
+                    _db.ProviderCategories.Add(new ProviderCategory
+                    {
+                        ProviderUid = newProvider.Uid,
+                        CategoryUid = model.CategoryUid!.Value,
+                        IsPrimary = true,
+                        CreatedOn = DateTime.Now
+                    });
+                }
+                else
+                {
+                    _db.Staff.Add(new Staff
+                    {
+                        UserUid = user.Uid,
+                        FullName = fullName,
+                        IsAdmin = isAdmin,
+                        Designation = model.Role,
+                        CreatedOn = DateTime.Now
+                    });
+                }
+
+                await _db.SaveChangesAsync(cancellationToken);
+                await tx.CommitAsync(cancellationToken);
+
+                _logger.LogInformation("UsersLogin {Uid} created with role {Role}.", user.Uid, model.Role);
+                return (true, Array.Empty<string>());
             }
-            else
+            catch (Exception ex)
             {
-                _db.Staff.Add(new Staff
-                {
-                    UserUid = user.Uid,
-                    FullName = fullName,
-                    IsAdmin = isAdmin,
-                    Designation = model.Role,
-                    CreatedOn = DateTime.Now
-                });
+                await tx.RollbackAsync(cancellationToken);
+                _logger.LogError(ex, "Failed to create UsersLogin.");
+                return (false, new[] { "Failed to create user." });
             }
-
-            await _db.SaveChangesAsync(cancellationToken);
-            await tx.CommitAsync(cancellationToken);
-
-            _logger.LogInformation("UsersLogin {Uid} created with role {Role}.", user.Uid, model.Role);
-            return (true, Array.Empty<string>());
-        }
-        catch (Exception ex)
-        {
-            await tx.RollbackAsync(cancellationToken);
-            _logger.LogError(ex, "Failed to create UsersLogin.");
-            return (false, new[] { "Failed to create user." });
-        }
+        });
     }
 
     public async Task<(bool Success, IEnumerable<string> Errors)> UpdateUserAsync(

@@ -138,6 +138,9 @@ Table: ProviderCategories
   -- Providers.CategoryUID scalar by ProviderCategoryService.SyncCategoriesAsync (the only
   -- intended writer of Providers.CategoryUID going forward).
   -- Backfilled from every existing Providers.CategoryUID at migration time (IsPrimary=1).
+  -- Catch-up (2026-09-23): 6 providers created in the gap between the migration's backfill and
+  -- the code deploy that writes this table on create/edit (UIDs 73-78) had zero rows; same
+  -- backfill query re-run manually to close the gap. No such gap should recur going forward.
   -- Managed via GET/PUT /api/providers/{providerUid}/categories (see api.txt). Job-inbox
   -- matching, nearby-provider search, and the category-delete in-use check all read this
   -- table (Any() match against ANY of a provider's categories) rather than the scalar.
