@@ -1,4 +1,4 @@
-# Version: 4.8 | UpdatedAt: 23/09/2026
+# Version: 4.9 | UpdatedAt: 23/09/2026
 # Database: SahulatAppDB
 # Server: 34.131.41.192,1433
 #
@@ -219,6 +219,12 @@ Table: ClientAddresses
   City             nvarchar(100)    NOT NULL
   Latitude         decimal(10,7)    NULL
   Longitude        decimal(10,7)    NULL
+  -- GPS pin-drop (v4.9): Latitude/Longitude are set via POST/PUT /api/client-addresses. (0,0) is
+  -- sent by every currently-published app build as its default (no real pin set yet) and is NOT
+  -- a valid real-world address location — treat (0,0) the same as NULL when checking "is a pin
+  -- set". API responses expose this via ClientAddressApiDto.HasLocation (true only when both
+  -- columns are non-null and not both zero) so consumers don't need to re-derive the convention.
+  -- No backfill needed for pre-existing NULL/zero rows; a client can set the pin later via PUT.
 
 --------------------------------------------------------------------------------
 Table: CustomerServiceRequests

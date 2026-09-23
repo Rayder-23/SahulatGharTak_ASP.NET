@@ -1,6 +1,8 @@
 # Flutter App Changes Tracker
 
-Running checklist of backend changes that the Flutter app needs to adopt to complete a feature's integration, or that are being deliberately held back as breaking changes pending approval. Updated incrementally as each backend feature lands — see `docs/feature-plan-multi-provider-notifications-billing-categories.md` for the full plan these entries come from, and **`api.txt` (repo root, currently v3.16) for the exact, authoritative request/response contract of every endpoint referenced below** — read the cited `api.txt` section before implementing, since this file only summarizes.
+Running checklist of backend changes that the Flutter app needs to adopt to complete a feature's integration, or that are being deliberately held back as breaking changes pending approval. Updated incrementally as each backend feature lands — **`api.txt` (repo root, currently v3.18) is the exact, authoritative request/response contract of every endpoint referenced below**; read the cited `api.txt` section before implementing, since this file only summarizes.
+
+Sections are removed once the Flutter app has fully adopted them — this file tracks *pending/active* work, not a history of everything ever shipped. Completed feature history lives in git log and `api.txt`'s own version notes, not here.
 
 **Standing constraint (2026-09-21):** the Flutter app is live on the Play Store and App Store, both of which have review/approval lag, while the backend/API can be updated instantly. Every backend change in this project is therefore built to be **additive and optional** — a currently-published app build must keep working completely unchanged against the updated backend, with zero risk of breakage while store approval for the new app version is pending. New fields on existing endpoints are nullable/optional with a legacy fallback; new endpoints are new routes an old app simply never calls. Nothing here is a hard cutover.
 
@@ -11,88 +13,54 @@ Legend:
 
 ---
 
-## Feature 2 — First-accept-wins multi-provider assignment
+## Client Address GPS Pin-Drop
 
-**Status: backend implemented and live (non-breaking). Flutter app has adopted it.**
+**Status: backend ready and live; Flutter app has adopted it (2026-09-23).**
 
-- **Adopted in-app**: `ProviderBookingsProvider.respond()` (`lib/providers/provider_bookings_provider.dart`) now detects the exact lost-race message and exposes a `lostRace` flag, auto-refreshes the bookings list via `loadBookings()` when it fires (so auto-cancelled sibling offers disappear immediately), and both call sites (`lib/screens/provider/requests/requests_tab.dart`, `lib/screens/provider/jobs/booking_detail_screen.dart`) show a distinct "Sorry, this job was just taken by another provider" toast instead of the generic error, with the detail screen also popping back out since the booking no longer belongs to that provider. No contract change — pure consumption of the already-live behavior.
+Adopted in-app:
+- `pubspec.yaml`: added `google_maps_flutter` and `geolocator`. Google Maps API keys wired into
+  `android/app/src/main/AndroidManifest.xml` (`com.google.android.geo.API_KEY` meta-data) and
+  `ios/Runner/AppDelegate.swift` (`GMSServices.provideAPIKey`), each restricted per-platform to
+  this app's package name / bundle ID. `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` added to
+  the Android manifest; `NSLocationWhenInUseUsageDescription` added to `Info.plist`.
+- `lib/services/location_permission_service.dart` (`LocationPermissionService`) — mirrors
+  `camera_permission_service.dart`'s shape, wraps `Permission.locationWhenInUse`.
+- `lib/models/reverse_geocode_result.dart` + `lib/services/geocoding_api_service.dart`
+  (`GeocodingApiService.reverseGeocode`) — thin call to `GET /api/geocoding/reverse`, called
+  directly from the screen (no repository/provider layer — a single one-off call, not shared
+  app state, consistent with this app's screen-scoped-fetch convention).
+- `lib/screens/add_address_screen.dart` reworked per the confirmed UX flow: `GoogleMap` at the
+  top (tap-to-place/drag pin), defaults to device GPS position when location permission is
+  granted else Karachi, explicit "Save Pin" button that calls reverse-geocode and pre-fills
+  Area/Full Address/City (still editable), and "Save Address" submits the pin + text fields
+  together in one call.
+- `lib/models/client_address.dart`: `latitude`/`longitude` are now nullable `double?` (was
+  non-nullable with a `?? 0` fallback), plus a new `hasLocation` field read straight from the
+  API. `lib/services/client_address_api_service.dart` / `lib/data/repositories/
+  client_address_repository.dart` / `lib/providers/client_address_provider.dart`: `latitude`/
+  `longitude` params are now nullable and omitted from the request body entirely when unset,
+  instead of defaulting to `(0, 0)` — `hasLocation` now stays meaningful. Editing an address
+  without touching the map still preserves the existing pin unchanged.
+- `lib/screens/profile_screen.dart`'s Addresses section shows a small location-pin icon next to
+  the address title when `hasLocation` is true, and a tappable "Set location" chip (opens Edit)
+  when false — this also covers addresses created before this feature existed.
+- Inline pin-drop map enlarged (220px -> 320px), plus a full-screen expand button
+  (`lib/screens/pin_location_fullscreen_screen.dart`, `lib/widgets/address_pin_map_view.dart`
+  shared between both) for placing a more precise pin. The map's built-in "my location" button
+  (`myLocationButtonEnabled`/`myLocationEnabled`) is now shown once location permission is
+  granted, in both the inline and full-screen map.
 
-- **`api.txt` section: `POST Respond To Booking (Provider Accept/Reject)`** (under `SERVICE BOOKINGS APIs`) — `POST /api/service-bookings/{bookingUid}/respond`. Read this section in full for the request/response shape; behavior change only, no field changes:
-  - When a job was offered to multiple providers, the first to call `accept:true` wins. Losing providers calling accept later now get a well-defined `400` response instead of silently succeeding or erroring generically — see `api.txt`'s "Fail (400 - lost the first-accept-wins race to another provider)" example under that section for the exact body.
-  - Recommended app change: handle that message as a distinct, expected case (toast/snackbar: "Sorry, this job was just taken by another provider") rather than a generic error, and refresh/re-fetch the provider's pending-jobs list when it occurs.
-  - Recommended app change: after any accept/reject action (the provider's own, or on a poll/push refresh cycle), re-fetch `GET /api/service-bookings?providerUid=` (see `api.txt`, `GET All Service Bookings` section) — a job another provider won will no longer appear in that list (it's auto-cancelled server-side), so a stale locally-cached list could still show a job that's no longer claimable.
-  - Double-tapping "accept" on a job the same provider already won is now idempotent — returns success again, not an error. No app change needed for this case, just noting it won't break existing retry logic.
+**Deferred idea — map search box (not implemented):** a text search field inside the pin-drop
+map (type a city/area, map jumps to it, then the user places the pin) would be a nice addition,
+but Google Places Autocomplete is billed (pay-per-session beyond the shared $200/month Maps
+Platform free credit), unlike Maps SDK rendering which is free. To keep this feature $0-cost like
+the rest of it, the plan if/when this gets picked up is to reuse the same free OpenStreetMap
+Nominatim service the backend already calls for `GET /api/geocoding/reverse` — but for **forward**
+search-by-text this time. That needs a new backend endpoint (e.g. `GET /api/geocoding/search?q=`)
+mirroring the existing reverse one; out of scope for a Flutter-only change, so this is parked here
+for the backend agent to pick up, not started.
 
-No breaking contract change — the request/response shape of `/respond` is unchanged; only new failure-message text and list-visibility behavior were added.
-
----
-
-## Feature 7 — Three admin-portal notification icons
-
-**Status: backend + admin-portal UI implemented and live. N/A for Flutter — admin-portal-only feature.** No Flutter app impact; not documented in `api.txt` (no mobile-facing endpoint); nothing to track here.
-
----
-
-## Feature 8 — Labour charge + itemized material breakdown
-
-**Status: backend implemented and live, fully optional/additive — no breaking change, nothing held for approval. Flutter app has adopted the completion-dialog half of this feature (job-completion screen only; the standalone material-items edit/correct flow below was not built and remains available for later).**
-
-- **Adopted in-app**: the provider's job-completion dialog (`_CompletionDialog` in `lib/screens/provider/jobs/booking_detail_screen.dart`) now has an optional numeric-only Labour Charge field and a repeatable material-item row list (name, quantity, unit price), threaded through `ProviderBookingsProvider.verifyCompletion()` → `ProviderBookingsRepository.verifyCompletion()` → `ServiceBookingApiService.verifyCompletion()` (`lib/services/service_booking_api_service.dart`) as optional `labourAmount`/`materialItems` params, mirroring the "new app" `verify-completion` request shape from this doc's linked `api.txt` section byte-for-byte when filled in, and the legacy byte-for-byte-unchanged body when left blank. New model: `lib/models/provider/material_item.dart` (`MaterialItem`).
-- **Not built**: the standalone `GET`/`PUT /api/service-bookings/{bookingUid}/material-items` "edit receipt after the fact" endpoints are not yet consumed anywhere in the app — deliberately deferred, no screen exists for post-completion receipt correction. Still available for a future pass.
-- **Backend cleanup note for a future pass**: this app version is now sending the labour/material-aware `verify-completion` request shape whenever the provider fills in those optional fields, but it still sends the legacy byte-for-byte body when they're left blank (no forced adoption) — so the `TODO(remove after old app retired)` backend items listed above (in `VerifyCompletionPasscodeDto.cs`, `BookingService.VerifyCompletionPasscodeAsync`, and the api.txt legacy example) should **not** be actioned yet purely because of this Flutter change; they still require the field to be made mandatory client-side (not done here) or every prior published app version to be confirmed retired, whichever comes first, before that cleanup is safe.
-
-- **`api.txt` section: `POST Verify Completion Passcode (Provider marks job Completed)`** (under `SERVICE BOOKINGS APIs`) — `POST /api/service-bookings/{bookingUid}/verify-completion`. Read this section in full — it now documents TWO request-body examples side by side ("current/legacy app" and "new app, optionally sending the labour/material split"), plus a full Notes block explaining each optional field:
-  - Two **optional** new fields on the request: `labourAmount` (decimal) and `materialItems` (array of `{itemName, quantity, unitPrice}`).
-  - **Current/published app build — omits both fields:** request/response are byte-for-byte unchanged from before this feature (matches the "current/legacy app" example in `api.txt`). Commission and provider earning are still computed on the whole `actualAmountPaid`, exactly as today. `ServiceBookings.LabourAmount` stays `NULL` for these bookings (an admin can fill it in later via the portal if needed).
-  - **New app build — sends `labourAmount`:** commission/provider earning switch to being computed off `labourAmount` only; any `materialItems` sent are added into the customer-facing `finalAmount`/receipt total but are not commissionable. This is the intended long-term behavior — matches the "new app" example in `api.txt`.
-  - Recommended app change (whenever convenient, no urgency): job-completion screen gets a Labour Charges input plus a repeatable "add material item" row (item name, quantity, unit price), sent alongside the existing passcode/amount-paid fields.
-- **`api.txt` sections: `GET Booking Material Items` and `PUT Booking Material Items (Full Replace)`** (under `SERVICE BOOKINGS APIs`, immediately following the verify-completion section) — `GET`/`PUT /api/service-bookings/{bookingUid}/material-items`. New, additive-only endpoints (new routes — old app never calls them, nothing to break): manage a booking's itemized material list directly, independent of the completion call (e.g. for an "edit receipt" screen, or admin corrections). See those sections for the exact `materialItems` request/response shape (`itemName`, `quantity`, `unitPrice`, `amount`).
-- **Marked for cleanup once the new app version is confirmed live on both stores** (search codebase for `TODO(remove after old app retired)`):
-  - `HomeServicesPortal/Models/Api/VerifyCompletionPasscodeDto.cs` — `LabourAmount`/`MaterialItems` can become non-nullable/required once no live build omits them.
-  - `HomeServicesPortal/Services/BookingService.cs` (`VerifyCompletionPasscodeAsync`) — the `labourAmount ?? booking.FinalAmount` legacy fallback (whole-amount commission when the app didn't send labour) can be simplified to always use `labourAmount ?? 0`.
-  - `api.txt`'s `POST Verify Completion Passcode` section — the "current/legacy app" request-body example and its explanatory Notes bullets can be deleted, leaving only the labour/material-aware shape as the sole documented contract. Bump `api.txt`'s version header when that cleanup lands.
-
----
-
-## Feature 9 — Provider multi-category support
-
-**Status: fully implemented and live, including the provider-upgrade flow — fully optional/additive, no breaking change, nothing held for approval. Flutter app has adopted it.**
-
-- **Adopted in-app**: `CategoryPickerScreen` (`lib/screens/category_picker_screen.dart`) is now multi-select (checkbox-style, returns a `List<Category>`, was single-select before this change — confirmed via a codebase-wide search that it had exactly one caller, so no dual-mode compatibility shim was needed). `ProviderRegistrationScreen` (`lib/screens/provider_registration_screen.dart`) now lets a provider pick multiple categories and choose one as primary (via a `ChoiceChip` row shown when 2+ are selected), and submits `categoryIds`/`primaryCategoryId` — the legacy singular `categoryId`/`categoryName` args were removed from `AuthApiService.registerProvider()`/`AuthProvider.registerProvider()` entirely (`lib/services/auth_api_service.dart`, `lib/providers/auth_provider.dart`), since the registration screen was this method's only caller.
-- **New "My Categories" section**: added to the provider profile tab (`lib/screens/provider/profile/profile_tab.dart`), backed by a new `GET`/`PUT /api/providers/{providerUid}/categories` integration — `lib/services/provider_categories_api_service.dart`, `lib/data/repositories/provider_categories_repository.dart`, `lib/providers/provider_categories_provider.dart` (registered in `lib/main.dart`'s `MultiProvider`), `lib/models/provider/provider_category.dart`. Shows the provider's current categories with a primary badge, and an "Edit" action that reopens the (now-multi-select) `CategoryPickerScreen` pre-seeded with the current set, then full-replaces via the `PUT` endpoint.
-- **Backend cleanup note for a future pass**: this Flutter change removes the app's *only* code path that ever sent the legacy `categoryId`/`categoryName` register-provider request fields — every registration submitted by this app version onward sends `categoryIds`/`primaryCategoryId`. Once this app version is confirmed live on both stores (no meaningfully active install base still on an older build), the `TODO(remove after old app retired)` backend items already listed above under Feature 9 become safe to action:
-  - `HomeServicesPortal/DTOs/RegisterProviderRequest.cs` — the `CategoryId`/`CategoryName` fields and validation branch.
-  - `HomeServicesPortal/Services/AuthService.cs` (`RegisterProviderAsync`) — the `multiCategoryRequested` branch check and legacy single-`ResolveCategoryAsync` fallback can be collapsed to always require the multi-category path.
-  - `api.txt`'s `POST Register Provider` section — the "current/legacy app" request-body example and its explanatory Notes bullets.
-  - This is a status note for whoever does that backend cleanup, not an instruction carried out here — no backend code was touched by this Flutter change.
-
-Note on flow: there is no standalone "register as provider" screen — the app registers a **client** account, and an existing client later **upgrades** to provider via `POST /api/auth/register-provider` (the client's `Clients` row is kept, not replaced). This is the only registration-time entry point for a provider's category selection, and it's the endpoint described below.
-
-- A provider can now hold multiple service categories (e.g. Electrician + Plumber), not just one. New table `ProviderCategories` (see `db.txt`, table `ProviderCategories`, added in v4.5), backfilled for every existing provider from their current category (as primary). `db.txt`'s `Providers` table entry also documents `CategoryUID` as deprecated — read that note before touching any code that still reads the scalar.
-- **`api.txt` sections: `GET Provider Categories` and `PUT Provider Categories (Full Replace)`** (under `PROVIDERS DETAIL APIs`) — `GET`/`PUT /api/providers/{providerUid}/categories`. Available now (non-breaking, app can adopt whenever convenient):
-  - `GET` — lists all of a provider's categories, flags which one is primary.
-  - `PUT` — full-replace a provider's category set: `{ "categoryIds": [1,3], "primaryCategoryId": 1 }` (exact shape and validation-failure bodies documented in that `api.txt` section).
-  - This is enough to let a provider (or admin on their behalf) manage additional categories post-upgrade without touching the upgrade endpoint at all. Suggested app feature: a "My Categories" section on the provider profile screen using these two endpoints.
-- **`api.txt` section: `POST Register Provider (upgrade client to provider)`** (under `AUTH APIs`) — `POST /api/auth/register-provider`. Read this section in full — like Feature 8's completion endpoint, it now documents TWO request-body examples side by side ("current/legacy app" and "new app, optionally registering multiple categories"):
-  - Two **optional** new fields on the request: `categoryIds` (array of int) and `primaryCategoryId` (int), alongside the existing `categoryId`/`categoryName`.
-  - **Current/published app build — omits both, sends `categoryId` or `categoryName` as before:** request/response behavior is byte-for-byte unchanged (matches the "current/legacy app" example in `api.txt`). Provider is registered with exactly that one category (as primary). The response now additionally includes a `categoryIds` array, but it's just `[categoryId]` in this case — safe to ignore if the app doesn't read it.
-  - **New app build — sends `categoryIds` + `primaryCategoryId`:** provider is registered with ALL of `categoryIds` in one step, `primaryCategoryId` flagged primary; `categoryId`/`categoryName` in the request are ignored if `categoryIds` is present. Matches the "new app" example in `api.txt`.
-  - Recommended app change (whenever convenient, no urgency): the upgrade-to-provider screen's category picker becomes a multi-select (checkboxes) instead of a single picker, with a way to mark one as primary, submitting `categoryIds`/`primaryCategoryId` instead of `categoryId`.
-- **Marked for cleanup once the new app version is confirmed live on both stores** (search codebase for `TODO(remove after old app retired)`):
-  - `HomeServicesPortal/DTOs/RegisterProviderRequest.cs` — the `CategoryId`/`CategoryName` single-category fields and their validation branch can be retired once every live build always sends `CategoryIds`+`PrimaryCategoryId`.
-  - `HomeServicesPortal/Services/AuthService.cs` (`RegisterProviderAsync`) — the `multiCategoryRequested` branch and the legacy single-`ResolveCategoryAsync` fallback can be collapsed to always require the multi-category path.
-  - `api.txt`'s `POST Register Provider` section — the "current/legacy app" request-body example and its explanatory Notes bullets can be deleted, leaving only the `categoryIds`/`primaryCategoryId` shape as the sole documented contract. Bump `api.txt`'s version header when that cleanup lands.
-  - Once `CategoryUid` scalar reads are fully migrated off (see `db.txt`'s `Providers.CategoryUID` deprecation note), the column itself can be dropped in a further fast-follow — out of scope for the app-facing cleanup above.
-
----
-
-## Timezone — UTC "Z" suffix fix on API DateTime fields
-
-**Status: backend implemented and live (non-breaking, no shape change). Not yet confirmed adopted in-app.**
-
-- **What changed**: every `DateTime` field in every API response is still UTC (this was already true), but now serializes with an explicit ISO-8601 "Z" suffix (e.g. `"2026-09-22T11:29:43.137Z"` instead of `"2026-09-22T11:29:43.137"`). Root cause: EF Core returns SQL Server `datetime` columns as `Kind=Unspecified`, so the default JSON serializer previously omitted the UTC marker — added a global `UtcDateTimeJsonConverter` (`HomeServicesPortal/Models/Api/UtcDateTimeJsonConverter.cs`, registered in `Program.cs`) that fixes this for every outbound `DateTime` across all API DTOs.
-- **Why**: confirmed live that the admin portal was displaying raw UTC values unconverted (e.g. a request submitted at 4:29 PM Pakistan time showed as 11:29 AM) — the missing "Z" suffix meant the Flutter app likely has/had the same issue if it was ever displaying these timestamps without first converting from UTC.
-- **No field/shape change** — only the string format of existing `DateTime` values changes (gains "Z"). No new fields, no renamed fields, nothing to opt into.
-- **Recommended app change (whenever convenient, no urgency, but worth checking)**: audit anywhere the app parses/displays a `DateTime` string from an API response — ensure it's parsed as UTC (`DateTime.parse(str)` in Dart already respects a trailing "Z" and marks the result as UTC automatically) and converted with `.toLocal()` (or an explicit Pakistan-time conversion) before display, rather than treated as an already-local string. If the app was previously naively displaying these raw strings, this fix means the *correct* fix is now possible client-side — but the app still needs to actually call `.toLocal()`/convert, since the raw value was always UTC and still is.
-- Admin portal side of this same fix: all `.cshtml` views now convert UTC → PKT (UTC+5) via a new `Helpers/PktTimeHelper.cs` before rendering — not applicable to the Flutter app, mentioned here only for context.
-- See `api.txt`'s "DateTime fields" note (top of file, under the header) and `db.txt`'s TIMEZONE STANDARD note (v4.8) for the full backend-side writeup.
+Backend contract reference (already live, no further backend work needed for this feature):
+- `POST`/`PUT /api/client-addresses` accept optional `latitude`/`longitude` (both nullable decimals) — see `api.txt`'s `POST Client Address (Create)` / `PUT Client Address (Update)` sections under `CLIENT ADDRESSES APIs`. If you send one, you must send both (a validation `Fail (400)` catches a one-sided payload — see that section's Notes).
+- `GET /api/geocoding/reverse?lat=&lng=` resolves a coordinate pair into a human-readable address (road, area, city, state, postcode) via free OpenStreetMap Nominatim — no API key needed. See `api.txt`'s `GEOCODING APIs` section.
+- Every `ClientAddress` response (`GET`/`POST`/`PUT /api/client-addresses`) includes `hasLocation: bool` — `true` only when a real pin is set (treats `(0, 0)` the same as "no pin").
