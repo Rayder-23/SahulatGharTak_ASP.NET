@@ -1,6 +1,6 @@
 # Flutter App Changes Tracker
 
-Running checklist of backend changes that the Flutter app needs to adopt to complete a feature's integration, or that are being deliberately held back as breaking changes pending approval. Updated incrementally as each backend feature lands — **`api.txt` (repo root, currently v3.18) is the exact, authoritative request/response contract of every endpoint referenced below**; read the cited `api.txt` section before implementing, since this file only summarizes.
+Running checklist of backend changes that the Flutter app needs to adopt to complete a feature's integration, or that are being deliberately held back as breaking changes pending approval. Updated incrementally as each backend feature lands — **`api.txt` (repo root, currently v3.19) is the exact, authoritative request/response contract of every endpoint referenced below**; read the cited `api.txt` section before implementing, since this file only summarizes.
 
 Sections are removed once the Flutter app has fully adopted them — this file tracks *pending/active* work, not a history of everything ever shipped. Completed feature history lives in git log and `api.txt`'s own version notes, not here.
 
@@ -50,17 +50,20 @@ Adopted in-app:
   (`myLocationButtonEnabled`/`myLocationEnabled`) is now shown once location permission is
   granted, in both the inline and full-screen map.
 
-**Deferred idea — map search box (not implemented):** a text search field inside the pin-drop
-map (type a city/area, map jumps to it, then the user places the pin) would be a nice addition,
-but Google Places Autocomplete is billed (pay-per-session beyond the shared $200/month Maps
-Platform free credit), unlike Maps SDK rendering which is free. To keep this feature $0-cost like
-the rest of it, the plan if/when this gets picked up is to reuse the same free OpenStreetMap
-Nominatim service the backend already calls for `GET /api/geocoding/reverse` — but for **forward**
-search-by-text this time. That needs a new backend endpoint (e.g. `GET /api/geocoding/search?q=`)
-mirroring the existing reverse one; out of scope for a Flutter-only change, so this is parked here
-for the backend agent to pick up, not started.
+**Map search box — backend ready (2026-09-24), Flutter UI not started:** a text search field
+inside the pin-drop map (type a city/area, map jumps to it, then the user places the exact pin)
+would be a nice addition. Backend now provides `GET /api/geocoding/search?q={text}&limit={n}`
+(free OpenStreetMap Nominatim forward search, same $0-cost approach as reverse geocoding, soft-biased
+to Pakistan) — see `api.txt`'s `GEOCODING APIs` section, `GET Search Geocode (forward)` entry.
+Returns a list of `{displayName, road, area, city, state, postalCode, latitude, longitude}`
+candidates (empty list, not an error, when nothing matches). Build spec for whoever picks this up:
+add a search box above/inside the pin-drop map, debounce input, call this endpoint, let the user
+tap a result to jump the map camera to that `(latitude, longitude)` — the user still places the
+final pin manually afterward (search result accuracy is approximate; this only gets the map close).
+Google Places Autocomplete was deliberately avoided since it's billed per-session.
 
-Backend contract reference (already live, no further backend work needed for this feature):
+Backend contract reference (already live, no further backend work needed for the core feature):
 - `POST`/`PUT /api/client-addresses` accept optional `latitude`/`longitude` (both nullable decimals) — see `api.txt`'s `POST Client Address (Create)` / `PUT Client Address (Update)` sections under `CLIENT ADDRESSES APIs`. If you send one, you must send both (a validation `Fail (400)` catches a one-sided payload — see that section's Notes).
-- `GET /api/geocoding/reverse?lat=&lng=` resolves a coordinate pair into a human-readable address (road, area, city, state, postcode) via free OpenStreetMap Nominatim — no API key needed. See `api.txt`'s `GEOCODING APIs` section.
+- `GET /api/geocoding/reverse?lat=&lng=` resolves a coordinate pair into a human-readable address (road, area, city, state, postcode) via free OpenStreetMap Nominatim — no API key needed, English-only results. See `api.txt`'s `GEOCODING APIs` section.
+- `GET /api/geocoding/search?q=&limit=` forward-geocodes free text into candidate coordinates (see above) — new, not yet used by any screen.
 - Every `ClientAddress` response (`GET`/`POST`/`PUT /api/client-addresses`) includes `hasLocation: bool` — `true` only when a real pin is set (treats `(0, 0)` the same as "no pin").
