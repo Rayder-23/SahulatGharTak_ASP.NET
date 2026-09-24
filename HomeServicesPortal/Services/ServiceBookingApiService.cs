@@ -337,6 +337,8 @@ public class ServiceBookingApiService : IServiceBookingApiService
             Uid = b.Uid,
             RequestUid = b.RequestUid,
             RequestTitle = b.Request.ServiceTitle,
+            PreferredServiceDate = b.Request.PreferredServiceDate,
+            PreferredServiceTime = b.Request.PreferredServiceTime,
             ClientUid = b.ClientUid,
             ClientName = b.Client.FullName,
             ProviderUid = b.ProviderUid,
