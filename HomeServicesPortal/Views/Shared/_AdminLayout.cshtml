@@ -65,7 +65,7 @@
         activeSection = "finance";
     else if (TabClass("/admin/reports") == "active")
         activeSection = "reports";
-    else if (TabClass("/admin/services", "/admin/servicecategories", "/admin/servicetitles", "/admin/administration", "/admin/apkmanagement", "/admin/configurations") == "active")
+    else if (TabClass("/admin/services", "/admin/servicecategories", "/admin/servicetitles", "/admin/administration", "/admin/apkmanagement", "/admin/configurations", "/admin/preferences") == "active")
         activeSection = "setup";
 }
 
@@ -681,7 +681,7 @@
                         <li>
                             <span class="hs-utility-link d-none d-xl-inline-flex">
                                 <i class="fa-regular fa-calendar"></i>
-                                @DateTime.Now.ToString("dddd, dd MMM yyyy")
+                                @DateTime.Now.ToString("dddd, dd-MM-yyyy")
                             </span>
                         </li>
                         <li>
@@ -929,6 +929,9 @@
                         </a>
                         <a class="hs-nav-link hs-nav-sublink @NavClass("/admin/configurations")" href="/Admin/Configurations">
                             <i class="fa-solid fa-sliders"></i> Configurations
+                        </a>
+                        <a class="hs-nav-link hs-nav-sublink @NavClass("/admin/preferences")" href="/Admin/Preferences">
+                            <i class="fa-solid fa-gear"></i> Preferences
                         </a>
                         <a class="hs-nav-link hs-nav-sublink @NavClass("/admin/administration/users", "/admin/administration/roles")" href="/Admin/Administration/Users">
                             <i class="fa-solid fa-user-shield"></i> Users &amp; Roles

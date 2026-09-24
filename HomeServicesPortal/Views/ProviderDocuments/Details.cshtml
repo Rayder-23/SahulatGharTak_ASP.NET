@@ -81,7 +81,7 @@
             <div class="col-md-6">
                 <div class="row g-2">
                     <div class="col-sm-4 pd-label">Verified On</div>
-                    <div class="col-sm-8 pd-value">@(Model.VerifiedOn.ToPktString("dd MMM yyyy HH:mm"))</div>
+                    <div class="col-sm-8 pd-value">@(Model.VerifiedOn.ToPktDisplay())</div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -102,7 +102,7 @@
             <div class="col-md-6">
                 <div class="row g-2">
                     <div class="col-sm-4 pd-label">Created</div>
-                    <div class="col-sm-8 pd-value">@Model.CreatedOn.ToPktString("dd MMM yyyy HH:mm")</div>
+                    <div class="col-sm-8 pd-value">@Model.CreatedOn.ToPktDisplay()</div>
                 </div>
             </div>
         </div>
@@ -111,7 +111,7 @@
             <div class="col-md-6">
                 <div class="row g-2">
                     <div class="col-sm-4 pd-label">Updated</div>
-                    <div class="col-sm-8 pd-value">@(Model.UpdatedOn.ToPktString("dd MMM yyyy HH:mm"))</div>
+                    <div class="col-sm-8 pd-value">@(Model.UpdatedOn.ToPktDisplay())</div>
                 </div>
             </div>
             <div class="col-md-6"></div>

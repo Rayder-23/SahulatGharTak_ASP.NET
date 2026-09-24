@@ -86,6 +86,7 @@ builder.Services.AddScoped<IImageService, ImageService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<IApkManagementService, ApkManagementService>();
 builder.Services.AddScoped<IConfigurationEntryService, ConfigurationEntryService>();
+builder.Services.AddScoped<IPreferencesService, PreferencesService>();
 builder.Services.AddScoped<IProviderDocumentRepository, ProviderDocumentRepository>();
 builder.Services.AddScoped<IProviderDocumentsApiService, ProviderDocumentsApiService>();
 builder.Services.AddScoped<IProviderLocationQueryService, ProviderLocationQueryService>();
@@ -251,6 +252,15 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Seed the in-process TimeFormatPreference cache from the DB so every view/helper reads the
+// admin's saved 12h/24h choice from process start, not just after someone opens the Preferences
+// page (which is what actually refreshes it thereafter — see PreferencesController).
+using (var startupScope = app.Services.CreateScope())
+{
+    var preferencesService = startupScope.ServiceProvider.GetRequiredService<IPreferencesService>();
+    await preferencesService.GetUse12HourAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
