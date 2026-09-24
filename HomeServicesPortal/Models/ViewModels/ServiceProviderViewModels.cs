@@ -139,6 +139,7 @@ public class ServiceProviderDocumentTabVm
     public string? ProfilePhotoPath { get; set; }
     public string? CnicFrontImagePath { get; set; }
     public string? CnicBackImagePath { get; set; }
+    public string? PoliceVerificationPath { get; set; }
     public bool IsVerified { get; set; }
     public DateTime? VerifiedOn { get; set; }
     public int? VerifiedBy { get; set; }

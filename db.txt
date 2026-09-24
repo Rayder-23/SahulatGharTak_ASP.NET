@@ -1,4 +1,4 @@
-# Version: 4.9 | UpdatedAt: 23/09/2026
+# Version: 4.10 | UpdatedAt: 24/09/2026
 # Database: SahulatAppDB
 # Server: 34.131.41.192,1433
 #
@@ -156,6 +156,7 @@ Table: ProviderDocuments
   ProfilePhotoPath     nvarchar(500)    NULL
   CNICFrontImagePath   nvarchar(500)    NULL
   CNICBackImagePath    nvarchar(500)    NULL
+  PoliceVerificationPath nvarchar(500)  NULL
   IsVerified           bit              NOT NULL  DEFAULT (0)
   VerifiedOn           datetime         NULL
   VerifiedBy           int              NULL
@@ -163,6 +164,9 @@ Table: ProviderDocuments
   CreatedOn            datetime         NOT NULL  DEFAULT (getutcdate())
   UpdatedOn            datetime         NULL
   -- Relative paths only (e.g. uploads/providers/125/profile.jpg). One row per provider.
+  -- PoliceVerificationPath added v4.10 (2026-09-24): optional/nullable, unlike the three original
+  -- image columns above. Not required on first submission (unlike Profile/CNICFront/CNICBack) —
+  -- old app builds never send it, new app builds may omit it too. No backfill needed.
   -- Indexes: IX_ProviderDocuments_CreatedOn, IX_ProviderDocuments_MissingProfilePhoto (filtered),
   --          IX_ProviderDocuments_CNICImagesPresent (filtered), UQ_ProviderDocuments_MobileNo
 

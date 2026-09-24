@@ -95,6 +95,7 @@ public class ServiceProviderService : IServiceProviderService
                 ProfilePhotoPath = d.ProfilePhotoPath,
                 CnicFrontImagePath = d.CnicFrontImagePath,
                 CnicBackImagePath = d.CnicBackImagePath,
+                PoliceVerificationPath = d.PoliceVerificationPath,
                 IsVerified = false, // display unused; status comes from Providers.IsVerified
                 VerifiedOn = d.VerifiedOn,
                 VerifiedBy = d.VerifiedBy,

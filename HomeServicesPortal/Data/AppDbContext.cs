@@ -486,6 +486,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.ProfilePhotoPath).HasMaxLength(500);
             entity.Property(e => e.CnicFrontImagePath).HasColumnName("CNICFrontImagePath").HasMaxLength(500);
             entity.Property(e => e.CnicBackImagePath).HasColumnName("CNICBackImagePath").HasMaxLength(500);
+            entity.Property(e => e.PoliceVerificationPath).HasMaxLength(500);
             entity.Property(e => e.IsVerified).HasDefaultValue(false);
             entity.Property(e => e.VerifiedOn).HasColumnType("datetime");
             entity.Property(e => e.VerifiedBy);

@@ -1,6 +1,6 @@
 # Flutter App Changes Tracker
 
-Running checklist of backend changes that the Flutter app needs to adopt to complete a feature's integration, or that are being deliberately held back as breaking changes pending approval. Updated incrementally as each backend feature lands — **`api.txt` (repo root, currently v3.19) is the exact, authoritative request/response contract of every endpoint referenced below**; read the cited `api.txt` section before implementing, since this file only summarizes.
+Running checklist of backend changes that the Flutter app needs to adopt to complete a feature's integration, or that are being deliberately held back as breaking changes pending approval. Updated incrementally as each backend feature lands — **`api.txt` (repo root, currently v3.20) is the exact, authoritative request/response contract of every endpoint referenced below**; read the cited `api.txt` section before implementing, since this file only summarizes.
 
 Sections are removed once the Flutter app has fully adopted them — this file tracks *pending/active* work, not a history of everything ever shipped. Completed feature history lives in git log and `api.txt`'s own version notes, not here.
 
@@ -13,57 +13,49 @@ Legend:
 
 ---
 
-## Client Address GPS Pin-Drop
+## Provider Document: Police Verification
 
-**Status: backend ready and live; Flutter app has adopted it (2026-09-23).**
+**Status: backend ready and live (2026-09-24); Flutter provider-onboarding flow not started.**
 
-Adopted in-app:
-- `pubspec.yaml`: added `google_maps_flutter` and `geolocator`. Google Maps API keys wired into
-  `android/app/src/main/AndroidManifest.xml` (`com.google.android.geo.API_KEY` meta-data) and
-  `ios/Runner/AppDelegate.swift` (`GMSServices.provideAPIKey`), each restricted per-platform to
-  this app's package name / bundle ID. `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` added to
-  the Android manifest; `NSLocationWhenInUseUsageDescription` added to `Info.plist`.
-- `lib/services/location_permission_service.dart` (`LocationPermissionService`) — mirrors
-  `camera_permission_service.dart`'s shape, wraps `Permission.locationWhenInUse`.
-- `lib/models/reverse_geocode_result.dart` + `lib/services/geocoding_api_service.dart`
-  (`GeocodingApiService.reverseGeocode`) — thin call to `GET /api/geocoding/reverse`, called
-  directly from the screen (no repository/provider layer — a single one-off call, not shared
-  app state, consistent with this app's screen-scoped-fetch convention).
-- `lib/screens/add_address_screen.dart` reworked per the confirmed UX flow: `GoogleMap` at the
-  top (tap-to-place/drag pin), defaults to device GPS position when location permission is
-  granted else Karachi, explicit "Save Pin" button that calls reverse-geocode and pre-fills
-  Area/Full Address/City (still editable), and "Save Address" submits the pin + text fields
-  together in one call.
-- `lib/models/client_address.dart`: `latitude`/`longitude` are now nullable `double?` (was
-  non-nullable with a `?? 0` fallback), plus a new `hasLocation` field read straight from the
-  API. `lib/services/client_address_api_service.dart` / `lib/data/repositories/
-  client_address_repository.dart` / `lib/providers/client_address_provider.dart`: `latitude`/
-  `longitude` params are now nullable and omitted from the request body entirely when unset,
-  instead of defaulting to `(0, 0)` — `hasLocation` now stays meaningful. Editing an address
-  without touching the map still preserves the existing pin unchanged.
-- `lib/screens/profile_screen.dart`'s Addresses section shows a small location-pin icon next to
-  the address title when `hasLocation` is true, and a tappable "Set location" chip (opens Edit)
-  when false — this also covers addresses created before this feature existed.
-- Inline pin-drop map enlarged (220px -> 320px), plus a full-screen expand button
-  (`lib/screens/pin_location_fullscreen_screen.dart`, `lib/widgets/address_pin_map_view.dart`
-  shared between both) for placing a more precise pin. The map's built-in "my location" button
-  (`myLocationButtonEnabled`/`myLocationEnabled`) is now shown once location permission is
-  granted, in both the inline and full-screen map.
+A new, fully optional 4th provider document slot alongside the existing Profile Photo / CNIC
+Front / CNIC Back. Unlike those three, Police Verification is **never required** — not on
+first-time registration, not on edit — so a currently-published app build that only ever sends
+the original three fields is completely unaffected and keeps working unchanged.
 
-**Map search box — backend ready (2026-09-24), Flutter UI not started:** a text search field
-inside the pin-drop map (type a city/area, map jumps to it, then the user places the exact pin)
-would be a nice addition. Backend now provides `GET /api/geocoding/search?q={text}&limit={n}`
-(free OpenStreetMap Nominatim forward search, same $0-cost approach as reverse geocoding, soft-biased
-to Pakistan) — see `api.txt`'s `GEOCODING APIs` section, `GET Search Geocode (forward)` entry.
-Returns a list of `{displayName, road, area, city, state, postalCode, latitude, longitude}`
-candidates (empty list, not an error, when nothing matches). Build spec for whoever picks this up:
-add a search box above/inside the pin-drop map, debounce input, call this endpoint, let the user
-tap a result to jump the map camera to that `(latitude, longitude)` — the user still places the
-final pin manually afterward (search result accuracy is approximate; this only gets the map close).
-Google Places Autocomplete was deliberately avoided since it's billed per-session.
+Backend contract reference (already live):
+- `POST /api/provider/upload-documents` (multipart) gained a new optional form field
+  `PoliceVerification` (file, jpg/jpeg/png, max 5 MB) — see `api.txt`'s
+  `POST Upload Provider Documents` section under `PROVIDER DOCUMENT APIs`. Send it alongside
+  (or instead of) the existing fields on either first submission or edit; omit it entirely and
+  nothing changes for that provider's row.
+- `GET`/`POST /api/provider/{providerUID}/documents` and the admin
+  `POST /api/provider/verify-documents` response now include a new `policeVerificationPath`
+  field (nullable string, `null` until uploaded) alongside the existing three path fields.
+- Uploading/replacing Police Verification does **not** reset `isVerified` (that flag tracks CNIC
+  identity verification only, unrelated to this document).
 
-Backend contract reference (already live, no further backend work needed for the core feature):
-- `POST`/`PUT /api/client-addresses` accept optional `latitude`/`longitude` (both nullable decimals) — see `api.txt`'s `POST Client Address (Create)` / `PUT Client Address (Update)` sections under `CLIENT ADDRESSES APIs`. If you send one, you must send both (a validation `Fail (400)` catches a one-sided payload — see that section's Notes).
-- `GET /api/geocoding/reverse?lat=&lng=` resolves a coordinate pair into a human-readable address (road, area, city, state, postcode) via free OpenStreetMap Nominatim — no API key needed, English-only results. See `api.txt`'s `GEOCODING APIs` section.
-- `GET /api/geocoding/search?q=&limit=` forward-geocodes free text into candidate coordinates (see above) — new, not yet used by any screen.
-- Every `ClientAddress` response (`GET`/`POST`/`PUT /api/client-addresses`) includes `hasLocation: bool` — `true` only when a real pin is set (treats `(0, 0)` the same as "no pin").
+Suggested build spec once the Flutter team picks this up (not started, no urgency — this document
+type has no deadline tied to it):
+1. Wherever the app currently captures Profile Photo / CNIC Front / CNIC Back during provider
+   registration or document-edit (mirror whatever screen/widget handles those three today), add
+   a 4th optional image-picker slot for "Police Verification" — same picker/crop/upload pattern,
+   just marked optional in the UI (no red-asterisk/required styling).
+2. Send it as `PoliceVerification` in the same multipart request as the other three when present;
+   omit the field entirely when the user hasn't provided one (do not send an empty/placeholder
+   file).
+3. Wherever the app reads back a provider's documents (e.g. a provider's own profile/documents
+   screen), surface `policeVerificationPath` the same way it already surfaces the other three
+   paths (thumbnail/"view" link when non-null, an empty/"not uploaded" state when null).
+4. No app-version gate needed — this is a new optional field on an existing endpoint; old and new
+   app builds both keep working against the updated backend with no coordination required.
+
+**Future decision, not yet made (flagged, not scheduled):** whether Police Verification should
+become *required* on first-time provider registration once the new app version (with the 4th
+upload slot) is confirmed live on both stores and old-app usage has dropped off. If/when that
+decision is made, the change is: add `PoliceVerification` to the `isFirstSubmission` required-file
+check in `ProviderDocumentsApiService.UploadDocumentsAsync`
+(`HomeServicesPortal/Services/ProviderDocumentsApiService.cs`) alongside `ProfilePhoto`/
+`CnicFront`/`CnicBack`, and the equivalent check in the admin `ProviderDocumentService.CreateAsync`
+(`HomeServicesPortal/Services/ProviderDocumentService.cs`). Do not make this change until that
+confirmation — flipping it early would break first-time registration for any still-active old
+app build.
